@@ -32,14 +32,14 @@ const Auth = () => {
 
     if (error) {
       toast({
-        title: "Error",
+        title: "خطا",
         description: error.message,
         variant: "destructive",
       });
     } else {
       toast({
-        title: "Success",
-        description: "Account created successfully! You can now sign in.",
+        title: "موفق",
+        description: "حساب با موفقیت ایجاد شد! اکنون می‌توانید وارد شوید.",
       });
     }
   };
@@ -57,7 +57,7 @@ const Auth = () => {
 
     if (error) {
       toast({
-        title: "Error",
+        title: "خطا",
         description: error.message,
         variant: "destructive",
       });
@@ -75,24 +75,25 @@ const Auth = () => {
               <Smartphone className="h-8 w-8" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Mobile Sales Manager</CardTitle>
+          <CardTitle className="text-2xl">مدیریت فروش موبایل</CardTitle>
           <CardDescription>
-            Manage your installment-based mobile phone business
+            مدیریت کسب و کار فروش اقساطی موبایل
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsTrigger value="signin">ورود</TabsTrigger>
+              <TabsTrigger value="signup">ثبت‌نام</TabsTrigger>
             </TabsList>
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signin-email">Email</Label>
+                  <Label htmlFor="signin-email">ایمیل</Label>
                   <Input
                     id="signin-email"
                     type="email"
+                    dir="ltr"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -100,10 +101,11 @@ const Auth = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password">Password</Label>
+                  <Label htmlFor="signin-password">رمز عبور</Label>
                   <Input
                     id="signin-password"
                     type="password"
+                    dir="ltr"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -111,17 +113,18 @@ const Auth = () => {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Signing in..." : "Sign In"}
+                  {loading ? "در حال ورود..." : "ورود"}
                 </Button>
               </form>
             </TabsContent>
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
+                  <Label htmlFor="signup-email">ایمیل</Label>
                   <Input
                     id="signup-email"
                     type="email"
+                    dir="ltr"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -129,10 +132,11 @@ const Auth = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
+                  <Label htmlFor="signup-password">رمز عبور</Label>
                   <Input
                     id="signup-password"
                     type="password"
+                    dir="ltr"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -141,7 +145,7 @@ const Auth = () => {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Creating account..." : "Create Account"}
+                  {loading ? "در حال ایجاد حساب..." : "ثبت‌نام"}
                 </Button>
               </form>
             </TabsContent>

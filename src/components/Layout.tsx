@@ -59,12 +59,12 @@ const Layout = ({ children }: LayoutProps) => {
   }
 
   const navigation = [
-    { name: "Dashboard", href: "/", icon: LayoutDashboard },
-    { name: "Partners", href: "/partners", icon: Users },
-    { name: "Inventory", href: "/inventory", icon: Smartphone },
-    { name: "Sales", href: "/sales", icon: ShoppingCart },
-    { name: "Customers", href: "/customers", icon: Users },
-    { name: "Installments", href: "/installments", icon: DollarSign },
+    { name: "داشبورد", href: "/", icon: LayoutDashboard },
+    { name: "شرکا", href: "/partners", icon: Users },
+    { name: "موجودی", href: "/inventory", icon: Smartphone },
+    { name: "فروش", href: "/sales", icon: ShoppingCart },
+    { name: "مشتریان", href: "/customers", icon: Users },
+    { name: "اقساط", href: "/installments", icon: DollarSign },
   ];
 
   return (
@@ -74,7 +74,7 @@ const Layout = ({ children }: LayoutProps) => {
         <div className="flex h-16 items-center px-4 md:px-6">
           <div className="flex items-center gap-2 font-semibold">
             <Smartphone className="h-6 w-6 text-primary" />
-            <span className="hidden sm:inline-block">Mobile Sales Manager</span>
+            <span className="hidden sm:inline-block">مدیریت فروش موبایل</span>
           </div>
           
           <nav className="ml-auto hidden md:flex items-center gap-4">
@@ -91,7 +91,7 @@ const Layout = ({ children }: LayoutProps) => {
             })}
             <Button variant="outline" size="sm" onClick={handleSignOut} className="gap-2">
               <LogOut className="h-4 w-4" />
-              Sign Out
+              خروج
             </Button>
           </nav>
 
@@ -130,7 +130,7 @@ const Layout = ({ children }: LayoutProps) => {
                 className="w-full justify-start gap-2"
               >
                 <LogOut className="h-4 w-4" />
-                Sign Out
+                خروج
               </Button>
             </nav>
           </div>

@@ -59,7 +59,7 @@ const Partners = () => {
       setPartners(data || []);
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: "خطا",
         description: error.message,
         variant: "destructive",
       });
@@ -76,8 +76,8 @@ const Partners = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Partner added successfully",
+        title: "موفق",
+        description: "شریک با موفقیت اضافه شد",
       });
 
       setOpen(false);
@@ -85,7 +85,7 @@ const Partners = () => {
       fetchPartners();
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: "خطا",
         description: error.message,
         variant: "destructive",
       });
@@ -102,29 +102,29 @@ const Partners = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Partners</h1>
+            <h1 className="text-3xl font-bold">شرکا</h1>
             <p className="text-muted-foreground">
-              Manage business partners and track contributions
+              مدیریت شرکای تجاری و پیگیری سرمایه‌گذاری‌ها
             </p>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Partner
+                افزودن شریک
               </Button>
             </DialogTrigger>
             <DialogContent>
               <form onSubmit={handleSubmit}>
                 <DialogHeader>
-                  <DialogTitle>Add New Partner</DialogTitle>
+                  <DialogTitle>افزودن شریک جدید</DialogTitle>
                   <DialogDescription>
-                    Enter the details of the new business partner.
+                    اطلاعات شریک تجاری جدید را وارد کنید.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
+                    <Label htmlFor="name">نام</Label>
                     <Input
                       id="name"
                       value={formData.name}
@@ -135,10 +135,11 @@ const Partners = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">ایمیل</Label>
                     <Input
                       id="email"
                       type="email"
+                      dir="ltr"
                       value={formData.email}
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
@@ -147,9 +148,10 @@ const Partners = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
+                    <Label htmlFor="phone">تلفن</Label>
                     <Input
                       id="phone"
+                      dir="ltr"
                       value={formData.phone}
                       onChange={(e) =>
                         setFormData({ ...formData, phone: e.target.value })
@@ -158,7 +160,7 @@ const Partners = () => {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button type="submit">Add Partner</Button>
+                  <Button type="submit">افزودن شریک</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -169,35 +171,35 @@ const Partners = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Total Contributions: ${totalContributions.toLocaleString()}
+              مجموع سرمایه‌گذاری: {totalContributions.toLocaleString()} تومان
             </CardTitle>
           </CardHeader>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>All Partners</CardTitle>
+            <CardTitle>همه شرکا</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="text-center py-8 text-muted-foreground">
-                Loading partners...
+                در حال بارگذاری شرکا...
               </div>
             ) : partners.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No partners added yet. Click "Add Partner" to get started.
+                هنوز شریکی اضافه نشده. برای شروع روی "افزودن شریک" کلیک کنید.
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
+                    <TableHead>نام</TableHead>
+                    <TableHead>ایمیل</TableHead>
+                    <TableHead>تلفن</TableHead>
                     <TableHead className="text-right">
-                      Total Contributions
+                      مجموع سرمایه‌گذاری
                     </TableHead>
-                    <TableHead className="text-right">Share %</TableHead>
+                    <TableHead className="text-right">درصد سهم</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -206,10 +208,10 @@ const Partners = () => {
                       <TableCell className="font-medium">
                         {partner.name}
                       </TableCell>
-                      <TableCell>{partner.email}</TableCell>
-                      <TableCell>{partner.phone || "—"}</TableCell>
+                      <TableCell dir="ltr" className="text-right">{partner.email}</TableCell>
+                      <TableCell dir="ltr" className="text-right">{partner.phone || "—"}</TableCell>
                       <TableCell className="text-right">
-                        ${Number(partner.total_contributions).toLocaleString()}
+                        {Number(partner.total_contributions).toLocaleString()} تومان
                       </TableCell>
                       <TableCell className="text-right font-medium text-primary">
                         {totalContributions > 0

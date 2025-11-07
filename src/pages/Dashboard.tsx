@@ -116,9 +116,9 @@ const Dashboard = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-muted-foreground">Loading dashboard...</div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">در حال بارگذاری داشبورد...</div>
+      </div>
       </Layout>
     );
   }
@@ -127,82 +127,82 @@ const Dashboard = () => {
     <Layout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <h1 className="text-3xl font-bold">داشبورد</h1>
           <p className="text-muted-foreground">
-            Overview of your mobile sales business
+            نمای کلی از کسب و کار فروش موبایل شما
           </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <MetricCard
-            title="Total Revenue"
-            value={`$${stats.totalRevenue.toLocaleString()}`}
+            title="درآمد کل"
+            value={`${stats.totalRevenue.toLocaleString()} تومان`}
             icon={DollarSign}
-            description="Total sales revenue"
+            description="مجموع درآمد فروش"
           />
           <MetricCard
-            title="Total Profit"
-            value={`$${stats.totalProfit.toLocaleString()}`}
+            title="سود کل"
+            value={`${stats.totalProfit.toLocaleString()} تومان`}
             icon={TrendingUp}
-            description="Profit from sold phones"
+            description="سود حاصل از فروش گوشی‌ها"
           />
           <MetricCard
-            title="Total Sales"
+            title="تعداد فروش"
             value={stats.totalSales}
             icon={ShoppingCart}
-            description="Completed transactions"
+            description="تراکنش‌های انجام شده"
           />
           <MetricCard
-            title="Available Inventory"
+            title="موجودی"
             value={stats.availablePhones}
             icon={Smartphone}
-            description="Phones ready for sale"
+            description="گوشی‌های آماده فروش"
           />
           <MetricCard
-            title="Active Customers"
+            title="مشتریان فعال"
             value={stats.activeCustomers}
             icon={Users}
-            description="Total registered customers"
+            description="مجموع مشتریان ثبت شده"
           />
           <MetricCard
-            title="Pending Installments"
-            value={`$${stats.pendingInstallments.toLocaleString()}`}
+            title="اقساط معوق"
+            value={`${stats.pendingInstallments.toLocaleString()} تومان`}
             icon={Clock}
-            description="Amount yet to be collected"
+            description="مبلغی که باید دریافت شود"
           />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
+              <CardTitle>دسترسی سریع</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <a
                 href="/sales"
                 className="block p-4 border rounded-lg hover:bg-accent transition-colors"
               >
-                <div className="font-medium">Record New Sale</div>
+                <div className="font-medium">ثبت فروش جدید</div>
                 <div className="text-sm text-muted-foreground">
-                  Create a new installment sale
+                  ایجاد فروش اقساطی جدید
                 </div>
               </a>
               <a
                 href="/installments"
                 className="block p-4 border rounded-lg hover:bg-accent transition-colors"
               >
-                <div className="font-medium">Manage Installments</div>
+                <div className="font-medium">مدیریت اقساط</div>
                 <div className="text-sm text-muted-foreground">
-                  Track and update payment status
+                  پیگیری و بروزرسانی وضعیت پرداخت
                 </div>
               </a>
               <a
                 href="/inventory"
                 className="block p-4 border rounded-lg hover:bg-accent transition-colors"
               >
-                <div className="font-medium">Add Inventory</div>
+                <div className="font-medium">افزودن به موجودی</div>
                 <div className="text-sm text-muted-foreground">
-                  Add new phones to inventory
+                  اضافه کردن گوشی جدید به موجودی
                 </div>
               </a>
             </CardContent>
@@ -210,24 +210,23 @@ const Dashboard = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Business Insights</CardTitle>
+              <CardTitle>تحلیل کسب و کار</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Average Sale Value
+                    میانگین ارزش فروش
                   </span>
                   <span className="font-medium">
-                    $
                     {stats.totalSales > 0
-                      ? Math.round(stats.totalRevenue / stats.totalSales)
-                      : 0}
+                      ? Math.round(stats.totalRevenue / stats.totalSales).toLocaleString()
+                      : 0} تومان
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Profit Margin
+                    حاشیه سود
                   </span>
                   <span className="font-medium text-success">
                     {stats.totalRevenue > 0
@@ -238,7 +237,7 @@ const Dashboard = () => {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Collection Rate
+                    نرخ وصولی
                   </span>
                   <span className="font-medium">
                     {stats.totalRevenue > 0
