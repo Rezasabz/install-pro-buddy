@@ -1,69 +1,24 @@
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
 import { Smartphone } from "lucide-react";
 
 const Auth = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast();
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-      },
-    });
-
-    setLoading(false);
-
-    if (error) {
-      toast({
-        title: "خطا",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "موفق",
-        description: "حساب با موفقیت ایجاد شد! اکنون می‌توانید وارد شوید.",
-      });
-    }
-  };
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      toast({
-        title: "خطا",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
+  useEffect(() => {
+    // بررسی اینکه آیا قبلاً وارد شده
+    const isLoggedIn = localStorage.getItem("isLoggedIn");
+    if (isLoggedIn === "true") {
       navigate("/");
     }
+  }, [navigate]);
+
+  const handleLogin = () => {
+    // برای MVP، فقط یک ورود ساده
+    localStorage.setItem("isLoggedIn", "true");
+    navigate("/");
   };
 
   return (
@@ -77,79 +32,26 @@ const Auth = () => {
           </div>
           <CardTitle className="text-2xl">مدیریت فروش موبایل</CardTitle>
           <CardDescription>
-            مدیریت کسب و کار فروش اقساطی موبایل
+            سیستم حرفه‌ای مدیریت فروش اقساطی موبایل
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">ورود</TabsTrigger>
-              <TabsTrigger value="signup">ثبت‌نام</TabsTrigger>
-            </TabsList>
-            <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signin-email">ایمیل</Label>
-                  <Input
-                    id="signin-email"
-                    type="email"
-                    dir="ltr"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signin-password">رمز عبور</Label>
-                  <Input
-                    id="signin-password"
-                    type="password"
-                    dir="ltr"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "در حال ورود..." : "ورود"}
-                </Button>
-              </form>
-            </TabsContent>
-            <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">ایمیل</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    dir="ltr"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">رمز عبور</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    dir="ltr"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "در حال ایجاد حساب..." : "ثبت‌نام"}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+        <CardContent className="space-y-4">
+          <div className="text-center text-sm text-muted-foreground">
+            <p>ویژگی‌های سیستم:</p>
+            <ul className="mt-2 space-y-1">
+              <li>✓ مدیریت شرکا و سرمایه</li>
+              <li>✓ کنترل موجودی گوشی‌ها</li>
+              <li>✓ ثبت فروش اقساطی</li>
+              <li>✓ پیگیری پرداخت اقساط</li>
+              <li>✓ محاسبه خودکار سود</li>
+            </ul>
+          </div>
+          <Button onClick={handleLogin} className="w-full" size="lg">
+            ورود به سیستم
+          </Button>
+          <p className="text-xs text-center text-muted-foreground">
+            نسخه MVP - داده‌ها در مرورگر ذخیره می‌شوند
+          </p>
         </CardContent>
       </Card>
     </div>

@@ -1,8 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { User, Session } from "@supabase/supabase-js";
 import {
   LayoutDashboard,
   Users,
@@ -12,45 +10,36 @@ import {
   LogOut,
   Menu,
   X,
+  Moon,
+  Sun,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/useTheme";
 
 interface LayoutProps {
   children: ReactNode;
 }
 
+interface User {
+  id: string;
+}
+
 const Layout = ({ children }: LayoutProps) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (!session) {
-        navigate("/auth");
-      }
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (!session) {
-        navigate("/auth");
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    const isLoggedIn = localStorage.getItem("isLoggedIn");
+    if (isLoggedIn !== "true") {
+      navigate("/auth");
+    } else {
+      setUser({ id: "local-user" } as User);
+    }
   }, [navigate]);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
+  const handleSignOut = () => {
+    localStorage.removeItem("isLoggedIn");
     navigate("/auth");
   };
 
@@ -89,6 +78,18 @@ const Layout = ({ children }: LayoutProps) => {
                 </Link>
               );
             })}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="h-9 w-9"
+            >
+              {theme === "light" ? (
+                <Moon className="h-4 w-4" />
+              ) : (
+                <Sun className="h-4 w-4" />
+              )}
+            </Button>
             <Button variant="outline" size="sm" onClick={handleSignOut} className="gap-2">
               <LogOut className="h-4 w-4" />
               خروج
@@ -124,6 +125,23 @@ const Layout = ({ children }: LayoutProps) => {
                   </Link>
                 );
               })}
+              <Button
+                variant="ghost"
+                onClick={toggleTheme}
+                className="w-full justify-start gap-2"
+              >
+                {theme === "light" ? (
+                  <>
+                    <Moon className="h-4 w-4" />
+                    تم تیره
+                  </>
+                ) : (
+                  <>
+                    <Sun className="h-4 w-4" />
+                    تم روشن
+                  </>
+                )}
+              </Button>
               <Button
                 variant="outline"
                 onClick={handleSignOut}

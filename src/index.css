@@ -8,107 +8,127 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    /* Light Theme - پالت رنگ سفارشی */
     --background: 210 40% 98%;
-    --foreground: 215 25% 15%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 210 100% 45%;
+    /* Primary: نارنجی گرم #fb5607 */
+    --primary: 18 98% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 155 60% 45%;
+    /* Secondary: بنفش جادویی #8338ec */
+    --secondary: 266 81% 57%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 30% 95%;
-    --muted-foreground: 215 15% 45%;
+    /* Info: آبی اعتماد #3a86ff */
+    --info: 217 100% 61%;
+    --info-foreground: 0 0% 100%;
 
-    --accent: 210 100% 95%;
-    --accent-foreground: 210 100% 35%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --success: 155 60% 45%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+
+    /* Success: سبز #10b981 */
+    --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    /* Warning: زرد طلایی #ffbe0b */
+    --warning: 45 100% 51%;
+    --warning-foreground: 222 47% 11%;
 
-    --destructive: 0 84.2% 60.2%;
+    /* Error/Destructive: قرمز #ef4444 */
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 30% 88%;
-    --input: 214 30% 88%;
-    --ring: 210 100% 45%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 18 98% 50%;
 
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 25% 15%;
-    --sidebar-primary: 210 100% 45%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 18 98% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 30% 95%;
-    --sidebar-accent-foreground: 210 100% 35%;
-    --sidebar-border: 214 30% 88%;
-    --sidebar-ring: 210 100% 45%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 18 98% 50%;
 
-    --chart-1: 210 100% 45%;
-    --chart-2: 155 60% 45%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 280 60% 50%;
-    --chart-5: 340 75% 55%;
+    --chart-1: 18 98% 50%;
+    --chart-2: 266 81% 57%;
+    --chart-3: 217 100% 61%;
+    --chart-4: 45 100% 51%;
+    --chart-5: 160 84% 39%;
   }
 
   .dark {
-    --background: 215 30% 10%;
+    /* Dark Theme - پالت رنگ سفارشی */
+    --background: 222 47% 11%;
     --foreground: 210 40% 98%;
 
-    --card: 215 28% 13%;
+    --card: 222 47% 15%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 215 28% 13%;
+    --popover: 222 47% 15%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 100% 50%;
+    /* Primary: نارنجی گرم #fb5607 */
+    --primary: 18 98% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 155 60% 50%;
+    /* Secondary: بنفش جادویی #8338ec */
+    --secondary: 266 81% 57%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 215 25% 20%;
-    --muted-foreground: 210 30% 65%;
+    /* Info: آبی اعتماد #3a86ff */
+    --info: 217 100% 61%;
+    --info-foreground: 0 0% 100%;
 
-    --accent: 210 60% 25%;
-    --accent-foreground: 210 100% 80%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
 
-    --success: 155 60% 50%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    /* Success: سبز #10b981 */
+    --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    /* Warning: زرد طلایی #ffbe0b */
+    --warning: 45 100% 51%;
+    --warning-foreground: 222 47% 11%;
 
-    --destructive: 0 62.8% 50%;
+    /* Error/Destructive: قرمز #ef4444 */
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 25% 20%;
-    --input: 215 25% 20%;
-    --ring: 210 100% 50%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 18 98% 50%;
 
-    --sidebar-background: 215 28% 13%;
+    --sidebar-background: 222 47% 15%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 210 100% 50%;
+    --sidebar-primary: 18 98% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 25% 20%;
-    --sidebar-accent-foreground: 210 100% 80%;
-    --sidebar-border: 215 25% 20%;
-    --sidebar-ring: 210 100% 50%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 18 98% 50%;
 
-    --chart-1: 210 100% 50%;
-    --chart-2: 155 60% 50%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 280 60% 60%;
-    --chart-5: 340 75% 65%;
+    --chart-1: 18 98% 50%;
+    --chart-2: 266 81% 57%;
+    --chart-3: 217 100% 61%;
+    --chart-4: 45 100% 51%;
+    --chart-5: 160 84% 39%;
   }
 }
 

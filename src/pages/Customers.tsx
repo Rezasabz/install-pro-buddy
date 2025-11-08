@@ -1,23 +1,10 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { Plus, UserPlus, Users as UsersIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -25,81 +12,91 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-
-interface Customer {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string;
-  address: string | null;
-  created_at: string;
-}
+import { customersStore, Customer, salesStore } from "@/lib/store";
+import { toJalaliDate, toPersianDigits } from "@/lib/persian";
+import { Plus, Edit, Trash2, Users, Phone, IdCard } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const Customers = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    email: "",
     phone: "",
+    nationalId: "",
     address: "",
   });
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchCustomers();
+    loadCustomers();
   }, []);
 
-  const fetchCustomers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("customers")
-        .select("*")
-        .order("created_at", { ascending: false });
+  const loadCustomers = () => {
+    setCustomers(customersStore.getAll());
+  };
 
-      if (error) throw error;
-      setCustomers(data || []);
-    } catch (error: any) {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (editingCustomer) {
+      customersStore.update(editingCustomer.id, formData);
+      toast({
+        title: "موفق",
+        description: "مشتری با موفقیت بروزرسانی شد",
+      });
+    } else {
+      customersStore.add(formData);
+      toast({
+        title: "موفق",
+        description: "مشتری جدید با موفقیت اضافه شد",
+      });
+    }
+
+    setFormData({ name: "", phone: "", nationalId: "", address: "" });
+    setEditingCustomer(null);
+    setIsDialogOpen(false);
+    loadCustomers();
+  };
+
+  const handleEdit = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setFormData({
+      name: customer.name,
+      phone: customer.phone,
+      nationalId: customer.nationalId,
+      address: customer.address,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    // بررسی اینکه آیا مشتری فروش فعال دارد
+    const sales = salesStore.getAll();
+    const hasActiveSales = sales.some(s => s.customerId === id && s.status === 'active');
+    
+    if (hasActiveSales) {
       toast({
         title: "خطا",
-        description: error.message,
+        description: "این مشتری فروش فعال دارد و نمی‌توان آن را حذف کرد",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
+      return;
+    }
+
+    if (confirm("آیا از حذف این مشتری اطمینان دارید؟")) {
+      customersStore.delete(id);
+      toast({
+        title: "موفق",
+        description: "مشتری با موفقیت حذف شد",
+      });
+      loadCustomers();
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const { error } = await supabase.from("customers").insert([
-        {
-          name: formData.name,
-          email: formData.email || null,
-          phone: formData.phone,
-          address: formData.address || null,
-        },
-      ]);
-
-      if (error) throw error;
-
-      toast({
-        title: "موفق",
-        description: "مشتری با موفقیت اضافه شد",
-      });
-
-      setOpen(false);
-      setFormData({ name: "", email: "", phone: "", address: "" });
-      fetchCustomers();
-    } catch (error: any) {
-      toast({
-        title: "خطا",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+  const getCustomerSalesCount = (customerId: string) => {
+    return salesStore.getAll().filter(s => s.customerId === customerId).length;
   };
 
   return (
@@ -109,140 +106,162 @@ const Customers = () => {
           <div>
             <h1 className="text-3xl font-bold">مدیریت مشتریان</h1>
             <p className="text-muted-foreground">
-              مدیریت اطلاعات مشتریان و سوابق خرید
+              مدیریت اطلاعات مشتریان و خریداران
             </p>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
+              <Button onClick={() => {
+                setEditingCustomer(null);
+                setFormData({ name: "", phone: "", nationalId: "", address: "" });
+              }}>
+                <Plus className="ml-2 h-4 w-4" />
                 افزودن مشتری
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <form onSubmit={handleSubmit}>
-                <DialogHeader>
-                  <DialogTitle>افزودن مشتری جدید</DialogTitle>
-                  <DialogDescription>
-                    اطلاعات تماس مشتری را وارد کنید
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">نام و نام خانوادگی</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">شماره تماس</Label>
-                    <Input
-                      id="phone"
-                      dir="ltr"
-                      placeholder="09123456789"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">ایمیل (اختیاری)</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      dir="ltr"
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="address">آدرس (اختیاری)</Label>
-                    <Textarea
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) =>
-                        setFormData({ ...formData, address: e.target.value })
-                      }
-                      rows={3}
-                    />
-                  </div>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingCustomer ? "ویرایش مشتری" : "افزودن مشتری جدید"}
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="name">نام و نام خانوادگی</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    required
+                    placeholder="نام کامل مشتری"
+                  />
                 </div>
-                <DialogFooter>
-                  <Button type="submit">افزودن مشتری</Button>
-                </DialogFooter>
+                <div>
+                  <Label htmlFor="phone">شماره تماس</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
+                    required
+                    placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="nationalId">کد ملی</Label>
+                  <Input
+                    id="nationalId"
+                    value={formData.nationalId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, nationalId: e.target.value })
+                    }
+                    required
+                    placeholder="۱۰ رقم"
+                    maxLength={10}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="address">آدرس</Label>
+                  <Textarea
+                    id="address"
+                    value={formData.address}
+                    onChange={(e) =>
+                      setFormData({ ...formData, address: e.target.value })
+                    }
+                    required
+                    placeholder="آدرس کامل محل سکونت"
+                    rows={3}
+                  />
+                </div>
+                <Button type="submit" className="w-full">
+                  {editingCustomer ? "بروزرسانی" : "افزودن"}
+                </Button>
               </form>
             </DialogContent>
           </Dialog>
         </div>
 
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">تعداد مشتریان</CardTitle>
-            <UsersIcon className="h-5 w-5 text-primary" />
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              تعداد مشتریان
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{customers.length} نفر</div>
+            <div className="text-3xl font-bold text-primary">
+              {toPersianDigits(customers.length)}
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              مشتری ثبت شده
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>لیست مشتریان</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                در حال بارگذاری...
-              </div>
-            ) : customers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                هنوز مشتری‌ای اضافه نشده. برای شروع روی "افزودن مشتری" کلیک کنید
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>نام</TableHead>
-                    <TableHead>شماره تماس</TableHead>
-                    <TableHead>ایمیل</TableHead>
-                    <TableHead>آدرس</TableHead>
-                    <TableHead>تاریخ ثبت</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {customers.map((customer) => (
-                    <TableRow key={customer.id}>
-                      <TableCell className="font-medium">
-                        {customer.name}
-                      </TableCell>
-                      <TableCell dir="ltr" className="text-right">
-                        {customer.phone}
-                      </TableCell>
-                      <TableCell dir="ltr" className="text-right">
-                        {customer.email || "—"}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {customer.address || "—"}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(customer.created_at).toLocaleDateString("fa-IR")}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {customers.map((customer) => (
+            <Card key={customer.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex justify-between items-start">
+                  <span className="text-lg">{customer.name}</span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(customer)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(customer.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span dir="ltr">{customer.phone}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <IdCard className="h-4 w-4 text-muted-foreground" />
+                  <span>{customer.nationalId}</span>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {customer.address}
+                </div>
+                <div className="pt-2 border-t">
+                  <div className="text-xs text-muted-foreground">
+                    تعداد خرید: {toPersianDigits(getCustomerSalesCount(customer.id))}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    تاریخ ثبت: {toJalaliDate(customer.createdAt)}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {customers.length === 0 && (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Users className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground text-center">
+                هنوز مشتری‌ای ثبت نشده است
+                <br />
+                برای شروع، یک مشتری اضافه کنید
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </Layout>
   );
