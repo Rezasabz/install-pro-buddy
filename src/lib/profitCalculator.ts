@@ -7,8 +7,8 @@ export interface PartnerFinancials {
   availableCapital: number; // سرمایه در دسترس
   usedCapital: number; // سرمایه استفاده شده
   share: number; // درصد سهم
-  initialProfit: number; // سود اولیه (تفاوت قیمت)
-  monthlyProfit: number; // سود ماهانه (4%)
+  initialProfit: number; // سود اولیه (تفاوت قیمت) - از Partner
+  monthlyProfit: number; // سود ماهانه (4%) - از Partner
   totalProfit: number; // مجموع سود
 }
 
@@ -87,9 +87,9 @@ export function calculateFinancials(): FinancialSummary {
     const share = totalCapital > 0 ? (partner.capital / totalCapital) * 100 : 0;
     const usedCapital = partner.capital - partner.availableCapital;
     
-    // سود بر اساس سهم
-    const initialProfit = Math.round((totalInitialProfit * share) / 100);
-    const monthlyProfit = Math.round((totalMonthlyProfit * share) / 100);
+    // سود مستقیماً از Partner گرفته می‌شود
+    const initialProfit = partner.initialProfit || 0;
+    const monthlyProfit = partner.monthlyProfit || 0;
     const totalPartnerProfit = initialProfit + monthlyProfit;
 
     return {
@@ -170,9 +170,9 @@ export function addCapitalFromPayment(principalAmount: number): void {
 }
 
 /**
- * افزایش سود شرکا بعد از دریافت سود ماهانه
+ * افزایش سود اولیه شرکا (تفاوت قیمت)
  */
-export function addProfitToPartners(profitAmount: number): void {
+export function addInitialProfitToPartners(profitAmount: number): void {
   const partners = partnersStore.getAll();
   const totalCapital = partners.reduce((sum, p) => sum + p.capital, 0);
 
@@ -181,7 +181,24 @@ export function addProfitToPartners(profitAmount: number): void {
     const profitShare = Math.round(profitAmount * share);
     
     partnersStore.update(partner.id, {
-      totalProfit: partner.totalProfit + profitShare,
+      initialProfit: partner.initialProfit + profitShare,
+    });
+  });
+}
+
+/**
+ * افزایش سود ماهانه شرکا (4%)
+ */
+export function addMonthlyProfitToPartners(profitAmount: number): void {
+  const partners = partnersStore.getAll();
+  const totalCapital = partners.reduce((sum, p) => sum + p.capital, 0);
+
+  partners.forEach(partner => {
+    const share = totalCapital > 0 ? partner.capital / totalCapital : 0;
+    const profitShare = Math.round(profitAmount * share);
+    
+    partnersStore.update(partner.id, {
+      monthlyProfit: partner.monthlyProfit + profitShare,
     });
   });
 }

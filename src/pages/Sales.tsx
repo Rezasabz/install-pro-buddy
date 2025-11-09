@@ -30,18 +30,20 @@ import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
 import { 
   calculateInstallments, 
   checkCapitalAvailability,
-  deductCapitalForPurchase 
+  deductCapitalForPurchase,
+  addInitialProfitToPartners
 } from "@/lib/profitCalculator";
-import { Plus, ShoppingCart, TrendingUp } from "lucide-react";
+import { Plus, ShoppingCart, TrendingUp, Trash2, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Sales = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; saleId: string }>({ open: false, saleId: '' });
   const [formData, setFormData] = useState({
     customerId: "",
+    phoneId: "", // گوشی از موجودی
     announcedPrice: "", // قیمت اعلام شده به مشتری
-    purchasePrice: "", // قیمت خرید واقعی
     downPayment: "",
     installmentMonths: "6",
   });
@@ -61,6 +63,7 @@ const Sales = () => {
 
   const customers = customersStore.getAll();
   const availablePhones = phonesStore.getAll().filter(p => p.status === 'available');
+  const allPhones = phonesStore.getAll();
 
   useEffect(() => {
     loadSales();
@@ -68,9 +71,12 @@ const Sales = () => {
 
   useEffect(() => {
     // محاسبه پیش‌نمایش
-    if (formData.announcedPrice && formData.purchasePrice && formData.downPayment && formData.installmentMonths) {
+    if (formData.phoneId && formData.announcedPrice && formData.downPayment && formData.installmentMonths) {
+      const phone = availablePhones.find(p => p.id === formData.phoneId);
+      if (!phone) return;
+
       const announcedPrice = parseFloat(formData.announcedPrice) || 0;
-      const purchasePrice = parseFloat(formData.purchasePrice) || 0;
+      const purchasePrice = phone.purchasePrice;
       const downPayment = parseFloat(formData.downPayment) || 0;
       const installmentMonths = parseInt(formData.installmentMonths);
 
@@ -88,17 +94,49 @@ const Sales = () => {
         });
       }
     }
-  }, [formData.announcedPrice, formData.purchasePrice, formData.downPayment, formData.installmentMonths]);
+  }, [formData.phoneId, formData.announcedPrice, formData.downPayment, formData.installmentMonths, availablePhones]);
 
   const loadSales = () => {
     setSales(salesStore.getAll());
   };
 
+  const handleDeleteSale = (saleId: string) => {
+    if (!confirm("⚠️ هشدار: با حذف این فروش، تمام اقساط مرتبط نیز حذف می‌شوند.\n\nآیا مطمئن هستید؟")) {
+      return;
+    }
+
+    // حذف اقساط مرتبط
+    const saleInstallments = installmentsStore.getBySaleId(saleId);
+    saleInstallments.forEach(inst => {
+      installmentsStore.delete(inst.id);
+    });
+
+    // حذف فروش
+    salesStore.delete(saleId);
+
+    toast({
+      title: "موفق",
+      description: "فروش و اقساط مرتبط با موفقیت حذف شدند",
+    });
+
+    loadSales();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const phone = availablePhones.find(p => p.id === formData.phoneId);
+    if (!phone) {
+      toast({
+        title: "خطا",
+        description: "گوشی انتخاب شده یافت نشد",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const announcedPrice = parseFloat(formData.announcedPrice);
-    const purchasePrice = parseFloat(formData.purchasePrice);
+    const purchasePrice = phone.purchasePrice;
     const downPayment = parseFloat(formData.downPayment);
     const installmentMonths = parseInt(formData.installmentMonths);
 
@@ -112,19 +150,10 @@ const Sales = () => {
       return;
     }
 
-    if (isNaN(purchasePrice) || purchasePrice <= 0) {
-      toast({
-        title: "خطا",
-        description: "قیمت خرید نامعتبر است",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (purchasePrice > announcedPrice) {
       toast({
         title: "خطا",
-        description: "قیمت خرید نمی‌تواند بیشتر از قیمت اعلامی باشد",
+        description: "قیمت اعلامی باید بیشتر از قیمت خرید باشد",
         variant: "destructive",
       });
       return;
@@ -157,7 +186,7 @@ const Sales = () => {
     // ایجاد فروش
     const newSale = salesStore.add({
       customerId: formData.customerId,
-      phoneId: crypto.randomUUID(), // شناسه موقت
+      phoneId: formData.phoneId,
       announcedPrice,
       purchasePrice,
       downPayment,
@@ -167,6 +196,9 @@ const Sales = () => {
       saleDate: new Date().toISOString(),
       status: 'active',
     });
+
+    // تغییر وضعیت گوشی به فروخته شده
+    phonesStore.update(formData.phoneId, { status: 'sold' });
 
     // ایجاد اقساط
     const today = new Date();
@@ -189,15 +221,18 @@ const Sales = () => {
     // کاهش سرمایه در دسترس
     deductCapitalForPurchase(purchasePrice);
 
+    // ثبت سود اولیه
+    addInitialProfitToPartners(initialProfit);
+
     toast({
       title: "موفق",
-      description: `فروش با موفقیت ثبت شد. سرمایه ${formatCurrency(purchasePrice)} کسر شد.`,
+      description: `فروش ثبت شد. سرمایه ${formatCurrency(purchasePrice)} کسر و سود اولیه ${formatCurrency(initialProfit)} ثبت شد.`,
     });
 
     setFormData({
       customerId: "",
+      phoneId: "",
       announcedPrice: "",
-      purchasePrice: "",
       downPayment: "",
       installmentMonths: "6",
     });
@@ -207,6 +242,7 @@ const Sales = () => {
 
   const getSaleDetails = (sale: Sale) => {
     const customer = customers.find(c => c.id === sale.customerId);
+    const phone = allPhones.find(p => p.id === sale.phoneId);
     const installments = installmentsStore.getBySaleId(sale.id);
     const paidInstallments = installments.filter(i => i.status === 'paid');
     
@@ -218,6 +254,7 @@ const Sales = () => {
 
     return {
       customer,
+      phone,
       paidAmount,
       remainingDebt,
       paidInterest,
@@ -226,7 +263,7 @@ const Sales = () => {
     };
   };
 
-  const totalRevenue = sales.reduce((sum, s) => sum + s.totalPrice, 0);
+  const totalRevenue = sales.reduce((sum, s) => sum + s.announcedPrice, 0);
   const activeSales = sales.filter(s => s.status === 'active').length;
 
   return (
@@ -245,13 +282,13 @@ const Sales = () => {
                 onClick={() => {
                   setFormData({
                     customerId: "",
+                    phoneId: "",
                     announcedPrice: "",
-                    purchasePrice: "",
                     downPayment: "",
                     installmentMonths: "6",
                   });
                 }}
-                disabled={customers.length === 0}
+                disabled={customers.length === 0 || availablePhones.length === 0}
               >
                 <Plus className="ml-2 h-4 w-4" />
                 ثبت فروش جدید
@@ -284,6 +321,35 @@ const Sales = () => {
                   </Select>
                 </div>
                 <div>
+                  <Label htmlFor="phoneId">گوشی از موجودی</Label>
+                  <Select
+                    value={formData.phoneId}
+                    onValueChange={(value) => {
+                      const phone = availablePhones.find(p => p.id === value);
+                      setFormData({ 
+                        ...formData, 
+                        phoneId: value,
+                        announcedPrice: phone ? phone.sellingPrice.toString() : ""
+                      });
+                    }}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="انتخاب گوشی" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePhones.map((phone) => (
+                        <SelectItem key={phone.id} value={phone.id}>
+                          {phone.brand} {phone.model} - خرید: {formatCurrency(phone.purchasePrice)} / فروش: {formatCurrency(phone.sellingPrice)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    گوشی‌های موجود در انبار
+                  </p>
+                </div>
+                <div>
                   <Label htmlFor="announcedPrice">قیمت اعلامی به مشتری (تومان)</Label>
                   <Input
                     id="announcedPrice"
@@ -296,23 +362,7 @@ const Sales = () => {
                     placeholder="مثال: ۲۲۰۰۰۰۰۰"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    قیمتی که به مشتری اعلام می‌کنید
-                  </p>
-                </div>
-                <div>
-                  <Label htmlFor="purchasePrice">قیمت خرید واقعی (تومان)</Label>
-                  <Input
-                    id="purchasePrice"
-                    type="number"
-                    value={formData.purchasePrice}
-                    onChange={(e) =>
-                      setFormData({ ...formData, purchasePrice: e.target.value })
-                    }
-                    required
-                    placeholder="مثال: ۲۰۰۰۰۰۰۰"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    قیمتی که گوشی را می‌خرید
+                    قیمتی که به مشتری اعلام می‌کنید (پیش‌فرض: قیمت فروش گوشی)
                   </p>
                 </div>
                 <div>
@@ -436,18 +486,31 @@ const Sales = () => {
               <Card key={sale.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex justify-between items-start">
-                    <div>
+                    <div className="flex-1">
                       <CardTitle className="text-lg">
                         {details.customer?.name || "نامشخص"}
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
+                        {details.phone ? `${details.phone.brand} ${details.phone.model}` : 'گوشی نامشخص'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
                         قیمت اعلامی: {formatCurrency(sale.announcedPrice)}
                       </p>
                     </div>
-                    <Badge variant={sale.status === 'active' ? 'default' : 'secondary'}>
-                      {sale.status === 'active' ? 'فعال' : 
-                       sale.status === 'completed' ? 'تکمیل شده' : 'معوق'}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={sale.status === 'active' ? 'default' : 'secondary'}>
+                        {sale.status === 'active' ? 'فعال' : 
+                         sale.status === 'completed' ? 'تکمیل شده' : 'معوق'}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteSale(sale.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -475,8 +538,18 @@ const Sales = () => {
                     <div className="text-sm text-muted-foreground">
                       پرداخت شده: {toPersianDigits(details.paidCount)} از {toPersianDigits(details.totalCount)} قسط
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      تاریخ فروش: {toJalaliDate(sale.saleDate)}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDetailsDialog({ open: true, saleId: sale.id })}
+                      >
+                        <Eye className="h-3 w-3 ml-1" />
+                        جزئیات
+                      </Button>
+                      <div className="text-xs text-muted-foreground">
+                        {toJalaliDate(sale.saleDate)}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -497,6 +570,85 @@ const Sales = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Dialog جزئیات فروش */}
+        <Dialog open={detailsDialog.open} onOpenChange={(open) => setDetailsDialog({ ...detailsDialog, open })}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>جزئیات فروش</DialogTitle>
+            </DialogHeader>
+            {(() => {
+              const sale = sales.find(s => s.id === detailsDialog.saleId);
+              if (!sale) return null;
+              
+              const details = getSaleDetails(sale);
+              const saleInstallments = installmentsStore.getBySaleId(sale.id);
+              
+              return (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm text-muted-foreground">مشتری</div>
+                      <div className="font-semibold">{details.customer?.name}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">گوشی</div>
+                      <div className="font-semibold">
+                        {details.phone ? `${details.phone.brand} ${details.phone.model}` : 'نامشخص'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">قیمت خرید</div>
+                      <div className="font-semibold">{formatCurrency(sale.purchasePrice)}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">قیمت اعلامی</div>
+                      <div className="font-semibold">{formatCurrency(sale.announcedPrice)}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">سود اولیه</div>
+                      <div className="font-semibold text-success">{formatCurrency(sale.initialProfit)}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">پیش‌پرداخت</div>
+                      <div className="font-semibold">{formatCurrency(sale.downPayment)}</div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    <h3 className="font-semibold mb-3">جدول اقساط</h3>
+                    <div className="space-y-2">
+                      {saleInstallments.map((inst) => (
+                        <div key={inst.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex-1">
+                            <div className="font-medium">قسط {toPersianDigits(inst.installmentNumber)}</div>
+                            <div className="text-xs text-muted-foreground">
+                              سررسید: {toJalaliDate(inst.dueDate)}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm">
+                              اصل: {formatCurrency(inst.principalAmount)}
+                            </div>
+                            <div className="text-sm text-secondary">
+                              سود: {formatCurrency(inst.interestAmount)}
+                            </div>
+                            <div className="font-semibold">
+                              مجموع: {formatCurrency(inst.totalAmount)}
+                            </div>
+                          </div>
+                          <Badge variant={inst.status === 'paid' ? 'default' : inst.status === 'overdue' ? 'destructive' : 'secondary'}>
+                            {inst.status === 'paid' ? 'پرداخت شده' : inst.status === 'overdue' ? 'معوق' : 'در انتظار'}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

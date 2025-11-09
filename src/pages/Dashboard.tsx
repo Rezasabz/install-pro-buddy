@@ -20,6 +20,7 @@ import {
   customersStore,
   installmentsStore,
   partnersStore,
+  transactionsStore,
 } from "@/lib/store";
 import { formatCurrency, toPersianDigits } from "@/lib/persian";
 import { loadSampleData, clearAllData } from "@/lib/sampleData";
@@ -226,44 +227,28 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-primary/5 border-primary/20">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <div className="text-primary">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+        {stats.totalSales === 0 && (
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <div className="text-primary">
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold mb-1">راهنمای شروع</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    برای شروع، روی دکمه "بارگذاری داده نمونه" کلیک کنید تا با سیستم آشنا شوید.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    💡 اگر خطایی مشاهده کردید، روی "پاک کردن همه" کلیک کنید و دوباره داده نمونه را بارگذاری کنید.
+                  </p>
+                </div>
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold mb-1">
-                  {stats.totalSales === 0 ? 'راهنمای شروع' : '⚠️ مشکل در نمایش داده‌ها'}
-                </h3>
-                {stats.totalSales === 0 ? (
-                  <>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      برای شروع، روی دکمه "بارگذاری داده نمونه" کلیک کنید تا با سیستم آشنا شوید.
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      💡 اگر خطایی مشاهده کردید، روی "پاک کردن همه" کلیک کنید و دوباره داده نمونه را بارگذاری کنید.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      اگر مقادیر صفر یا undefined می‌بینید، داده‌های قدیمی با ساختار جدید سازگار نیستند.
-                    </p>
-                    <p className="text-sm font-semibold text-destructive mb-2">
-                      راه حل: روی دکمه "پاک کردن همه" کلیک کنید و دوباره شروع کنید.
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      💡 این مشکل فقط یک بار اتفاق می‌افتد و بعد از پاک کردن، دیگر تکرار نمی‌شود.
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
@@ -290,14 +275,60 @@ const Dashboard = () => {
                 </div>
               </a>
               <a
-                href="/inventory"
+                href="/partners"
                 className="block p-4 border rounded-lg hover:bg-accent transition-colors"
               >
-                <div className="font-medium">افزودن به موجودی</div>
+                <div className="font-medium">مدیریت سرمایه</div>
                 <div className="text-sm text-muted-foreground">
-                  اضافه کردن گوشی جدید به موجودی
+                  افزایش یا برداشت سرمایه و سود
                 </div>
               </a>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>آخرین تراکنش‌های مالی</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const allTransactions = transactionsStore.getAll()
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .slice(0, 5);
+                
+                const partners = partnersStore.getAll();
+
+                if (allTransactions.length === 0) {
+                  return (
+                    <div className="text-center py-4 text-muted-foreground text-sm">
+                      هنوز تراکنشی ثبت نشده است
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2">
+                    {allTransactions.map((transaction) => {
+                      const partner = partners.find(p => p.id === transaction.partnerId);
+                      const isWithdraw = transaction.type.includes('withdraw');
+                      
+                      return (
+                        <div key={transaction.id} className="flex justify-between items-center p-2 border-b last:border-0">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium">{partner?.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {transaction.description}
+                            </div>
+                          </div>
+                          <div className={`text-sm font-semibold ${isWithdraw ? 'text-destructive' : 'text-success'}`}>
+                            {isWithdraw ? '-' : '+'}{formatCurrency(transaction.amount)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 

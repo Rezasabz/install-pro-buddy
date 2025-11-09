@@ -4,9 +4,20 @@ export interface Partner {
   name: string;
   capital: number; // سرمایه اولیه
   availableCapital: number; // سرمایه در دسترس (بعد از خرید گوشی‌ها)
-  totalProfit: number; // مجموع سود تا کنون
+  initialProfit: number; // سود اولیه (تفاوت قیمت)
+  monthlyProfit: number; // سود ماهانه (4%)
   share: number;
   createdAt: string;
+}
+
+export interface Transaction {
+  id: string;
+  partnerId: string;
+  type: 'capital_add' | 'capital_withdraw' | 'initial_profit_withdraw' | 'monthly_profit_withdraw' | 'profit_to_capital'; // نوع تراکنش
+  amount: number;
+  description: string;
+  date: string;
+  profitType?: 'initial' | 'monthly' | 'both'; // نوع سود برای تبدیل به سرمایه
 }
 
 export interface Phone {
@@ -63,6 +74,7 @@ const STORAGE_KEYS = {
   CUSTOMERS: 'customers',
   SALES: 'sales',
   INSTALLMENTS: 'installments',
+  TRANSACTIONS: 'transactions',
 };
 
 // Helper functions
@@ -79,13 +91,14 @@ function saveToStorage<T>(key: string, data: T[]): void {
 export const partnersStore = {
   getAll: (): Partner[] => getFromStorage<Partner>(STORAGE_KEYS.PARTNERS),
   
-  add: (partner: Omit<Partner, 'id' | 'createdAt' | 'availableCapital' | 'totalProfit'>): Partner => {
+  add: (partner: Omit<Partner, 'id' | 'createdAt' | 'availableCapital' | 'initialProfit' | 'monthlyProfit'>): Partner => {
     const partners = partnersStore.getAll();
     const newPartner: Partner = {
       ...partner,
       id: crypto.randomUUID(),
       availableCapital: partner.capital, // در ابتدا تمام سرمایه در دسترس است
-      totalProfit: 0,
+      initialProfit: 0,
+      monthlyProfit: 0,
       createdAt: new Date().toISOString(),
     };
     partners.push(newPartner);
@@ -254,6 +267,36 @@ export const installmentsStore = {
     if (filtered.length === installments.length) return false;
     
     saveToStorage(STORAGE_KEYS.INSTALLMENTS, filtered);
+    return true;
+  },
+};
+
+// Transactions
+export const transactionsStore = {
+  getAll: (): Transaction[] => getFromStorage<Transaction>(STORAGE_KEYS.TRANSACTIONS),
+  
+  getByPartnerId: (partnerId: string): Transaction[] => {
+    return transactionsStore.getAll().filter(t => t.partnerId === partnerId);
+  },
+  
+  add: (transaction: Omit<Transaction, 'id' | 'date'>): Transaction => {
+    const transactions = transactionsStore.getAll();
+    const newTransaction: Transaction = {
+      ...transaction,
+      id: crypto.randomUUID(),
+      date: new Date().toISOString(),
+    };
+    transactions.push(newTransaction);
+    saveToStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
+    return newTransaction;
+  },
+  
+  delete: (id: string): boolean => {
+    const transactions = transactionsStore.getAll();
+    const filtered = transactions.filter(t => t.id !== id);
+    if (filtered.length === transactions.length) return false;
+    
+    saveToStorage(STORAGE_KEYS.TRANSACTIONS, filtered);
     return true;
   },
 };

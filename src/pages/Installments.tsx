@@ -8,10 +8,11 @@ import {
   Installment,
   salesStore,
   customersStore,
+  partnersStore,
 } from "@/lib/store";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
-import { addCapitalFromPayment, addProfitToPartners } from "@/lib/profitCalculator";
-import { DollarSign, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { addCapitalFromPayment, addMonthlyProfitToPartners } from "@/lib/profitCalculator";
+import { DollarSign, CheckCircle, Clock, AlertCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Installments = () => {
@@ -54,8 +55,8 @@ const Installments = () => {
     // بازگشت اصل بدهی به سرمایه
     addCapitalFromPayment(installment.principalAmount);
 
-    // افزودن سود به حساب شرکا
-    addProfitToPartners(installment.interestAmount);
+    // افزودن سود ماهانه به حساب شرکا
+    addMonthlyProfitToPartners(installment.interestAmount);
 
     // بررسی اینکه آیا همه اقساط پرداخت شده‌اند
     const saleInstallments = installmentsStore.getBySaleId(installment.saleId);
@@ -73,6 +74,51 @@ const Installments = () => {
         description: `قسط پرداخت شد. اصل: ${formatCurrency(installment.principalAmount)} به سرمایه بازگشت. سود: ${formatCurrency(installment.interestAmount)}`,
       });
     }
+
+    loadInstallments();
+  };
+
+  const handleCancelPayment = (installmentId: string) => {
+    const installment = installmentsStore.getAll().find(i => i.id === installmentId);
+    if (!installment || installment.status !== 'paid') return;
+
+    if (!confirm("⚠️ آیا از لغو این پرداخت اطمینان دارید؟\n\nسرمایه و سود به حالت قبل برمی‌گردند.")) {
+      return;
+    }
+
+    // لغو پرداخت
+    installmentsStore.update(installmentId, {
+      status: 'pending',
+      paidDate: undefined,
+    });
+
+    // کسر اصل از سرمایه (برعکس عملیات پرداخت)
+    const partners = partnersStore.getAll();
+    const totalCapital = partners.reduce((sum, p) => sum + p.capital, 0);
+    partners.forEach(partner => {
+      const share = totalCapital > 0 ? partner.capital / totalCapital : 0;
+      const deduction = Math.round(installment.principalAmount * share);
+      partnersStore.update(partner.id, {
+        availableCapital: partner.availableCapital - deduction,
+      });
+    });
+
+    // کسر سود ماهانه از حساب شرکا
+    partners.forEach(partner => {
+      const share = totalCapital > 0 ? partner.capital / totalCapital : 0;
+      const profitDeduction = Math.round(installment.interestAmount * share);
+      partnersStore.update(partner.id, {
+        monthlyProfit: partner.monthlyProfit - profitDeduction,
+      });
+    });
+
+    // بروزرسانی وضعیت فروش
+    salesStore.update(installment.saleId, { status: 'active' });
+
+    toast({
+      title: "لغو شد",
+      description: "پرداخت قسط لغو شد و تغییرات برگشت داده شد",
+    });
 
     loadInstallments();
   };
@@ -220,15 +266,26 @@ const Installments = () => {
                       </div>
                     </div>
 
-                    {installment.status !== 'paid' && (
-                      <Button
-                        onClick={() => handlePayment(installment.id)}
-                        className="md:w-auto"
-                      >
-                        <DollarSign className="ml-2 h-4 w-4" />
-                        ثبت پرداخت
-                      </Button>
-                    )}
+                    <div className="flex gap-2">
+                      {installment.status !== 'paid' ? (
+                        <Button
+                          onClick={() => handlePayment(installment.id)}
+                          className="md:w-auto"
+                        >
+                          <DollarSign className="ml-2 h-4 w-4" />
+                          ثبت پرداخت
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          onClick={() => handleCancelPayment(installment.id)}
+                          className="md:w-auto"
+                        >
+                          <Trash2 className="ml-2 h-4 w-4" />
+                          لغو پرداخت
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
