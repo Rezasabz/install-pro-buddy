@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Backend Service (FastAPI) - Development
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: installment-backend-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend-db:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Frontend Service (React + Vite) - Development
+  frontend:
+    image: node:20-alpine
+    container_name: installment-frontend-dev
+    working_dir: /app
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 8080"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  backend-db:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

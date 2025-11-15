@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -9,18 +10,29 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { customersStore, Customer, salesStore } from "@/lib/store";
-import { toJalaliDate, toPersianDigits } from "@/lib/persian";
-import { Plus, Edit, Trash2, Users, Phone, IdCard } from "lucide-react";
+import { customersStore, Customer, salesStore, installmentsStore, phonesStore, Sale, Installment } from "@/lib/store";
+import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
+import { Plus, Edit, Trash2, Users, Phone, IdCard, Search, FileText, AlertCircle, CheckCircle, DollarSign, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Customers = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [customerDetailsDialog, setCustomerDetailsDialog] = useState<{ open: boolean; customerId: string }>({ open: false, customerId: '' });
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -33,8 +45,48 @@ const Customers = () => {
     loadCustomers();
   }, []);
 
+  useEffect(() => {
+    applyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customers, searchQuery, statusFilter]);
+
   const loadCustomers = () => {
     setCustomers(customersStore.getAll());
+  };
+
+  const applyFilters = () => {
+    let filtered = [...customers];
+
+    // جستجو
+    if (searchQuery) {
+      filtered = filtered.filter(c => 
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.phone.includes(searchQuery) ||
+        c.nationalId.includes(searchQuery)
+      );
+    }
+
+    // فیلتر وضعیت
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(c => {
+        const sales = salesStore.getAll().filter(s => s.customerId === c.id);
+        if (statusFilter === 'active') {
+          return sales.some(s => s.status === 'active');
+        } else if (statusFilter === 'completed') {
+          return sales.length > 0 && sales.every(s => s.status === 'completed');
+        } else if (statusFilter === 'overdue') {
+          return sales.some(s => {
+            const installments = installmentsStore.getBySaleId(s.id);
+            return installments.some(i => i.status === 'overdue');
+          });
+        } else if (statusFilter === 'no_purchase') {
+          return sales.length === 0;
+        }
+        return true;
+      });
+    }
+
+    setFilteredCustomers(filtered);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -99,10 +151,46 @@ const Customers = () => {
     return salesStore.getAll().filter(s => s.customerId === customerId).length;
   };
 
+  const getCustomerStats = (customerId: string) => {
+    const sales = salesStore.getAll().filter(s => s.customerId === customerId);
+    const totalPurchases = sales.reduce((sum, s) => sum + s.announcedPrice, 0);
+    let totalPaid = sales.reduce((sum, s) => sum + s.downPayment, 0);
+    
+    let totalRemaining = 0;
+    let overdueCount = 0;
+    let pendingCount = 0;
+    
+    sales.forEach(sale => {
+      const installments = installmentsStore.getBySaleId(sale.id);
+      installments.forEach(inst => {
+        if (inst.status !== 'paid') {
+          totalRemaining += inst.totalAmount;
+          if (inst.status === 'overdue') {
+            overdueCount++;
+          } else {
+            pendingCount++;
+          }
+        } else {
+          totalPaid += inst.totalAmount;
+        }
+      });
+    });
+
+    return {
+      salesCount: sales.length,
+      activeSales: sales.filter(s => s.status === 'active').length,
+      totalPurchases,
+      totalPaid,
+      totalRemaining,
+      overdueCount,
+      pendingCount,
+    };
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold">مدیریت مشتریان</h1>
             <p className="text-muted-foreground">
