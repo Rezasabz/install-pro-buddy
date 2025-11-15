@@ -23,6 +23,7 @@ import { phonesStore, Phone } from "@/lib/store";
 import { formatCurrency, toJalaliDate } from "@/lib/persian";
 import { Plus, Edit, Trash2, Smartphone, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { JalaliDatePicker } from "@/components/JalaliDatePicker";
 
 const Inventory = () => {
   const [phones, setPhones] = useState<Phone[]>([]);
@@ -34,8 +35,8 @@ const Inventory = () => {
     imei: "",
     purchasePrice: "",
     sellingPrice: "",
-    purchaseDate: new Date().toISOString().split('T')[0],
   });
+  const [purchaseDate, setPurchaseDate] = useState<Date>(new Date());
   const { toast } = useToast();
 
   useEffect(() => {
@@ -77,7 +78,7 @@ const Inventory = () => {
         imei: formData.imei,
         purchasePrice,
         sellingPrice,
-        purchaseDate: formData.purchaseDate,
+        purchaseDate: purchaseDate.toISOString(),
       });
       toast({
         title: "موفق",
@@ -91,7 +92,7 @@ const Inventory = () => {
         purchasePrice,
         sellingPrice,
         status: 'available',
-        purchaseDate: formData.purchaseDate,
+        purchaseDate: purchaseDate.toISOString(),
       });
       toast({
         title: "موفق",
@@ -105,8 +106,8 @@ const Inventory = () => {
       imei: "",
       purchasePrice: "",
       sellingPrice: "",
-      purchaseDate: new Date().toISOString().split('T')[0],
     });
+    setPurchaseDate(new Date());
     setEditingPhone(null);
     setIsDialogOpen(false);
     loadPhones();
@@ -120,8 +121,8 @@ const Inventory = () => {
       imei: phone.imei,
       purchasePrice: phone.purchasePrice.toString(),
       sellingPrice: phone.sellingPrice.toString(),
-      purchaseDate: phone.purchaseDate,
     });
+    setPurchaseDate(new Date(phone.purchaseDate));
     setIsDialogOpen(true);
   };
 
@@ -160,8 +161,8 @@ const Inventory = () => {
                   imei: "",
                   purchasePrice: "",
                   sellingPrice: "",
-                  purchaseDate: new Date().toISOString().split('T')[0],
                 });
+                setPurchaseDate(new Date());
               }}>
                 <Plus className="ml-2 h-4 w-4" />
                 افزودن گوشی
@@ -236,14 +237,10 @@ const Inventory = () => {
                 </div>
                 <div>
                   <Label htmlFor="purchaseDate">تاریخ خرید</Label>
-                  <Input
-                    id="purchaseDate"
-                    type="date"
-                    value={formData.purchaseDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, purchaseDate: e.target.value })
-                    }
-                    required
+                  <JalaliDatePicker
+                    value={purchaseDate}
+                    onChange={setPurchaseDate}
+                    placeholder="انتخاب تاریخ خرید"
                   />
                 </div>
                 <Button type="submit" className="w-full">
