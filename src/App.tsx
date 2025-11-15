@@ -13,11 +13,15 @@ import Customers from "./pages/Customers";
 import Installments from "./pages/Installments";
 import NotFound from "./pages/NotFound";
 import { needsMigration, migrateOldData } from "./lib/migration";
+import { fixPartnerData } from "./lib/fixData";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   useEffect(() => {
+    // رفع مشکلات داده‌های قدیمی
+    fixPartnerData();
+
     // بررسی و تبدیل داده‌های قدیمی
     if (needsMigration()) {
       console.log('🔄 در حال تبدیل داده‌های قدیمی...');
