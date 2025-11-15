@@ -1,3 +1,5 @@
+import { generateUUID } from './uuid';
+
 // Types
 export interface Partner {
   id: string;
@@ -95,7 +97,7 @@ export const partnersStore = {
     const partners = partnersStore.getAll();
     const newPartner: Partner = {
       ...partner,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       availableCapital: partner.capital, // در ابتدا تمام سرمایه در دسترس است
       initialProfit: 0,
       monthlyProfit: 0,
@@ -134,7 +136,7 @@ export const phonesStore = {
     const phones = phonesStore.getAll();
     const newPhone: Phone = {
       ...phone,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
     };
     phones.push(newPhone);
     saveToStorage(STORAGE_KEYS.PHONES, phones);
@@ -169,7 +171,7 @@ export const customersStore = {
     const customers = customersStore.getAll();
     const newCustomer: Customer = {
       ...customer,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       createdAt: new Date().toISOString(),
     };
     customers.push(newCustomer);
@@ -205,7 +207,7 @@ export const salesStore = {
     const sales = salesStore.getAll();
     const newSale: Sale = {
       ...sale,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
     };
     sales.push(newSale);
     saveToStorage(STORAGE_KEYS.SALES, sales);
@@ -244,7 +246,7 @@ export const installmentsStore = {
     const installments = installmentsStore.getAll();
     const newInstallment: Installment = {
       ...installment,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
     };
     installments.push(newInstallment);
     saveToStorage(STORAGE_KEYS.INSTALLMENTS, installments);
@@ -283,7 +285,7 @@ export const transactionsStore = {
     const transactions = transactionsStore.getAll();
     const newTransaction: Transaction = {
       ...transaction,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       date: new Date().toISOString(),
     };
     transactions.push(newTransaction);

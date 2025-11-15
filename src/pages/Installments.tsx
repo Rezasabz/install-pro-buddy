@@ -282,7 +282,7 @@ const Installments = () => {
         {/* فیلترها و جستجو */}
         <Card>
           <CardContent className="pt-6">
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <Label htmlFor="search" className="flex items-center gap-2 mb-2">
                   <Search className="h-4 w-4" />
@@ -557,7 +557,7 @@ const Installments = () => {
           </DialogContent>
         </Dialog>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
