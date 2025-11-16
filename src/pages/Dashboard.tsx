@@ -21,7 +21,9 @@ import {
   installmentsStore,
   partnersStore,
   transactionsStore,
-} from "@/lib/store";
+  Partner,
+  Transaction,
+} from "@/lib/storeProvider";
 import { formatCurrency, toPersianDigits } from "@/lib/persian";
 import { loadSampleData, clearAllData } from "@/lib/sampleData";
 import { calculateFinancials } from "@/lib/profitCalculator";
@@ -53,18 +55,23 @@ const Dashboard = () => {
     monthlyProfit: 0,
     totalProfit: 0,
   });
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchDashboardStats();
-  }, []);
-
-  const fetchDashboardStats = () => {
+  const fetchDashboardStats = async () => {
     try {
-      const sales = salesStore.getAll();
-      const customers = customersStore.getAll();
-      const installments = installmentsStore.getAll();
+      const [sales, customers, installments, allTransactions, allPartners] = await Promise.all([
+        salesStore.getAll(),
+        customersStore.getAll(),
+        installmentsStore.getAll(),
+        transactionsStore.getAll(),
+        partnersStore.getAll(),
+      ]);
+
+      setTransactions(allTransactions);
+      setPartners(allPartners);
 
       const totalRevenue = sales.reduce((sum, sale) => sum + sale.announcedPrice, 0);
       
@@ -87,10 +94,22 @@ const Dashboard = () => {
         monthlyProfit: financials.totalMonthlyProfit,
         totalProfit: financials.totalProfit,
       });
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در بارگذاری داشبورد",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchDashboardStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (
@@ -292,11 +311,9 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               {(() => {
-                const allTransactions = transactionsStore.getAll()
+                const allTransactions = transactions
                   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                   .slice(0, 5);
-                
-                const partners = partnersStore.getAll();
 
                 if (allTransactions.length === 0) {
                   return (

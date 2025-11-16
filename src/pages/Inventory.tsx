@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { phonesStore, Phone } from "@/lib/store";
+import { phonesStore, Phone } from "@/lib/storeProvider";
 import { formatCurrency, toJalaliDate } from "@/lib/persian";
 import { Plus, Edit, Trash2, Smartphone, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -43,11 +43,21 @@ const Inventory = () => {
     loadPhones();
   }, []);
 
-  const loadPhones = () => {
-    setPhones(phonesStore.getAll());
+  const loadPhones = async () => {
+    try {
+      const data = await phonesStore.getAll();
+      setPhones(data);
+    } catch (error) {
+      console.error('Error loading phones:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در بارگذاری گوشی‌ها",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const purchasePrice = parseFloat(formData.purchasePrice);
@@ -71,46 +81,55 @@ const Inventory = () => {
       return;
     }
 
-    if (editingPhone) {
-      phonesStore.update(editingPhone.id, {
-        brand: formData.brand,
-        model: formData.model,
-        imei: formData.imei,
-        purchasePrice,
-        sellingPrice,
-        purchaseDate: purchaseDate.toISOString(),
+    try {
+      if (editingPhone) {
+        await phonesStore.update(editingPhone.id, {
+          brand: formData.brand,
+          model: formData.model,
+          imei: formData.imei,
+          purchasePrice,
+          sellingPrice,
+          purchaseDate: purchaseDate.toISOString(),
+        });
+        toast({
+          title: "موفق",
+          description: "گوشی با موفقیت بروزرسانی شد",
+        });
+      } else {
+        await phonesStore.add({
+          brand: formData.brand,
+          model: formData.model,
+          imei: formData.imei,
+          purchasePrice,
+          sellingPrice,
+          status: 'available',
+          purchaseDate: purchaseDate.toISOString(),
+        });
+        toast({
+          title: "موفق",
+          description: "گوشی جدید با موفقیت اضافه شد",
+        });
+      }
+
+      setFormData({
+        brand: "",
+        model: "",
+        imei: "",
+        purchasePrice: "",
+        sellingPrice: "",
       });
+      setPurchaseDate(new Date());
+      setEditingPhone(null);
+      setIsDialogOpen(false);
+      loadPhones();
+    } catch (error) {
+      console.error('Error saving phone:', error);
       toast({
-        title: "موفق",
-        description: "گوشی با موفقیت بروزرسانی شد",
-      });
-    } else {
-      phonesStore.add({
-        brand: formData.brand,
-        model: formData.model,
-        imei: formData.imei,
-        purchasePrice,
-        sellingPrice,
-        status: 'available',
-        purchaseDate: purchaseDate.toISOString(),
-      });
-      toast({
-        title: "موفق",
-        description: "گوشی جدید با موفقیت اضافه شد",
+        title: "خطا",
+        description: "خطا در ذخیره گوشی",
+        variant: "destructive",
       });
     }
-
-    setFormData({
-      brand: "",
-      model: "",
-      imei: "",
-      purchasePrice: "",
-      sellingPrice: "",
-    });
-    setPurchaseDate(new Date());
-    setEditingPhone(null);
-    setIsDialogOpen(false);
-    loadPhones();
   };
 
   const handleEdit = (phone: Phone) => {
@@ -126,14 +145,23 @@ const Inventory = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("آیا از حذف این گوشی اطمینان دارید؟")) {
-      phonesStore.delete(id);
-      toast({
-        title: "موفق",
-        description: "گوشی با موفقیت حذف شد",
-      });
-      loadPhones();
+      try {
+        await phonesStore.delete(id);
+        toast({
+          title: "موفق",
+          description: "گوشی با موفقیت حذف شد",
+        });
+        loadPhones();
+      } catch (error) {
+        console.error('Error deleting phone:', error);
+        toast({
+          title: "خطا",
+          description: "خطا در حذف گوشی",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -221,6 +249,7 @@ const Inventory = () => {
                       setFormData({ ...formData, purchasePrice: e.target.value })
                     }
                     required
+                    placeholder="20000000"
                   />
                 </div>
                 <div>
@@ -233,6 +262,7 @@ const Inventory = () => {
                       setFormData({ ...formData, sellingPrice: e.target.value })
                     }
                     required
+                    placeholder="22000000"
                   />
                 </div>
                 <div>

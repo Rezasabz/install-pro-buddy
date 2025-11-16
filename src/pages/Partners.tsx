@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { partnersStore, Partner, transactionsStore } from "@/lib/store";
+import { partnersStore, Partner, transactionsStore } from "@/lib/storeProvider";
 import { formatCurrency, toPersianDigits } from "@/lib/persian";
 import { calculateFinancials, PartnerFinancials } from "@/lib/profitCalculator";
 import { Plus, Edit, Trash2, Users, TrendingUp, DollarSign, ArrowUp, ArrowDown } from "lucide-react";
@@ -44,26 +44,35 @@ const Partners = () => {
     loadPartners();
   }, []);
 
-  const loadPartners = () => {
-    const data = partnersStore.getAll();
-    // محاسبه سهم هر شریک بر اساس سرمایه
-    const totalCapital = data.reduce((sum, p) => sum + p.capital, 0);
-    const partnersWithShare = data.map(p => ({
-      ...p,
-      share: totalCapital > 0 ? (p.capital / totalCapital) * 100 : 0,
-    }));
-    setPartners(partnersWithShare);
+  const loadPartners = async () => {
+    try {
+      const data = await partnersStore.getAll();
+      // محاسبه سهم هر شریک بر اساس سرمایه
+      const totalCapital = data.reduce((sum, p) => sum + p.capital, 0);
+      const partnersWithShare = data.map(p => ({
+        ...p,
+        share: totalCapital > 0 ? (p.capital / totalCapital) * 100 : 0,
+      }));
+      setPartners(partnersWithShare);
 
-    // محاسبه وضعیت مالی هر شریک
-    const financials = calculateFinancials();
-    const financialMap = new Map<string, PartnerFinancials>();
-    financials.partnerFinancials.forEach(p => {
-      financialMap.set(p.partnerId, p);
-    });
-    setPartnerFinancials(financialMap);
+      // محاسبه وضعیت مالی هر شریک
+      const financials = calculateFinancials();
+      const financialMap = new Map<string, PartnerFinancials>();
+      financials.partnerFinancials.forEach(p => {
+        financialMap.set(p.partnerId, p);
+      });
+      setPartnerFinancials(financialMap);
+    } catch (error) {
+      console.error('Error loading partners:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در بارگذاری شرکا",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const capital = parseFloat(formData.capital);
@@ -76,31 +85,40 @@ const Partners = () => {
       return;
     }
 
-    if (editingPartner) {
-      partnersStore.update(editingPartner.id, {
-        name: formData.name,
-        capital,
-      });
+    try {
+      if (editingPartner) {
+        await partnersStore.update(editingPartner.id, {
+          name: formData.name,
+          capital,
+        });
+        toast({
+          title: "موفق",
+          description: "شریک با موفقیت بروزرسانی شد",
+        });
+      } else {
+        await partnersStore.add({
+          name: formData.name,
+          capital,
+          share: 0,
+        });
+        toast({
+          title: "موفق",
+          description: "شریک جدید با موفقیت اضافه شد",
+        });
+      }
+
+      setFormData({ name: "", capital: "" });
+      setEditingPartner(null);
+      setIsDialogOpen(false);
+      loadPartners();
+    } catch (error) {
+      console.error('Error saving partner:', error);
       toast({
-        title: "موفق",
-        description: "شریک با موفقیت بروزرسانی شد",
-      });
-    } else {
-      partnersStore.add({
-        name: formData.name,
-        capital,
-        share: 0,
-      });
-      toast({
-        title: "موفق",
-        description: "شریک جدید با موفقیت اضافه شد",
+        title: "خطا",
+        description: "خطا در ذخیره شریک",
+        variant: "destructive",
       });
     }
-
-    setFormData({ name: "", capital: "" });
-    setEditingPartner(null);
-    setIsDialogOpen(false);
-    loadPartners();
   };
 
   const handleEdit = (partner: Partner) => {
@@ -112,14 +130,23 @@ const Partners = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("آیا از حذف این شریک اطمینان دارید؟")) {
-      partnersStore.delete(id);
-      toast({
-        title: "موفق",
-        description: "شریک با موفقیت حذف شد",
-      });
-      loadPartners();
+      try {
+        await partnersStore.delete(id);
+        toast({
+          title: "موفق",
+          description: "شریک با موفقیت حذف شد",
+        });
+        loadPartners();
+      } catch (error) {
+        console.error('Error deleting partner:', error);
+        toast({
+          title: "خطا",
+          description: "خطا در حذف شریک",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -319,7 +346,7 @@ const Partners = () => {
                       setFormData({ ...formData, capital: e.target.value })
                     }
                     required
-                    placeholder="۱۰۰۰۰۰۰۰"
+                    placeholder="10000000"
                   />
                 </div>
                 <Button type="submit" className="w-full">

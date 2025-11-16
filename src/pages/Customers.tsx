@@ -20,7 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { customersStore, Customer, salesStore, installmentsStore, phonesStore, Sale, Installment } from "@/lib/store";
+import { customersStore, Customer, salesStore, installmentsStore, phonesStore, Sale, Installment } from "@/lib/storeProvider";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
 import { Plus, Edit, Trash2, Users, Phone, IdCard, Search, FileText, AlertCircle, CheckCircle, DollarSign, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +28,8 @@ import { useToast } from "@/hooks/use-toast";
 const Customers = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [installments, setInstallments] = useState<Installment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -41,17 +43,24 @@ const Customers = () => {
   });
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadCustomers();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customers, searchQuery, statusFilter]);
-
-  const loadCustomers = () => {
-    setCustomers(customersStore.getAll());
+  const loadCustomers = async () => {
+    try {
+      const [customersData, salesData, installmentsData] = await Promise.all([
+        customersStore.getAll(),
+        salesStore.getAll(),
+        installmentsStore.getAll(),
+      ]);
+      setCustomers(customersData);
+      setSales(salesData);
+      setInstallments(installmentsData);
+    } catch (error) {
+      console.error('Error loading customers:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در بارگذاری مشتریان",
+        variant: "destructive",
+      });
+    }
   };
 
   const applyFilters = () => {
@@ -69,18 +78,18 @@ const Customers = () => {
     // فیلتر وضعیت
     if (statusFilter !== 'all') {
       filtered = filtered.filter(c => {
-        const sales = salesStore.getAll().filter(s => s.customerId === c.id);
+        const customerSales = sales.filter(s => s.customerId === c.id);
         if (statusFilter === 'active') {
-          return sales.some(s => s.status === 'active');
+          return customerSales.some(s => s.status === 'active');
         } else if (statusFilter === 'completed') {
-          return sales.length > 0 && sales.every(s => s.status === 'completed');
+          return customerSales.length > 0 && customerSales.every(s => s.status === 'completed');
         } else if (statusFilter === 'overdue') {
-          return sales.some(s => {
-            const installments = installmentsStore.getBySaleId(s.id);
-            return installments.some(i => i.status === 'overdue');
+          return customerSales.some(s => {
+            const saleInstallments = installments.filter(i => i.saleId === s.id);
+            return saleInstallments.some(i => i.status === 'overdue');
           });
         } else if (statusFilter === 'no_purchase') {
-          return sales.length === 0;
+          return customerSales.length === 0;
         }
         return true;
       });
@@ -89,27 +98,46 @@ const Customers = () => {
     setFilteredCustomers(filtered);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    loadCustomers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customers, searchQuery, statusFilter]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (editingCustomer) {
-      customersStore.update(editingCustomer.id, formData);
+    try {
+      if (editingCustomer) {
+        await customersStore.update(editingCustomer.id, formData);
+        toast({
+          title: "موفق",
+          description: "مشتری با موفقیت بروزرسانی شد",
+        });
+      } else {
+        await customersStore.add(formData);
+        toast({
+          title: "موفق",
+          description: "مشتری جدید با موفقیت اضافه شد",
+        });
+      }
+
+      setFormData({ name: "", phone: "", nationalId: "", address: "" });
+      setEditingCustomer(null);
+      setIsDialogOpen(false);
+      loadCustomers();
+    } catch (error) {
+      console.error('Error saving customer:', error);
       toast({
-        title: "موفق",
-        description: "مشتری با موفقیت بروزرسانی شد",
-      });
-    } else {
-      customersStore.add(formData);
-      toast({
-        title: "موفق",
-        description: "مشتری جدید با موفقیت اضافه شد",
+        title: "خطا",
+        description: "خطا در ذخیره مشتری",
+        variant: "destructive",
       });
     }
-
-    setFormData({ name: "", phone: "", nationalId: "", address: "" });
-    setEditingCustomer(null);
-    setIsDialogOpen(false);
-    loadCustomers();
   };
 
   const handleEdit = (customer: Customer) => {
@@ -123,46 +151,54 @@ const Customers = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    // بررسی اینکه آیا مشتری فروش فعال دارد
-    const sales = salesStore.getAll();
-    const hasActiveSales = sales.some(s => s.customerId === id && s.status === 'active');
-    
-    if (hasActiveSales) {
+  const handleDelete = async (id: string) => {
+    try {
+      // بررسی اینکه آیا مشتری فروش فعال دارد
+      const hasActiveSales = sales.some(s => s.customerId === id && s.status === 'active');
+      
+      if (hasActiveSales) {
+        toast({
+          title: "خطا",
+          description: "این مشتری فروش فعال دارد و نمی‌توان آن را حذف کرد",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (confirm("آیا از حذف این مشتری اطمینان دارید؟")) {
+        await customersStore.delete(id);
+        toast({
+          title: "موفق",
+          description: "مشتری با موفقیت حذف شد",
+        });
+        loadCustomers();
+      }
+    } catch (error) {
+      console.error('Error deleting customer:', error);
       toast({
         title: "خطا",
-        description: "این مشتری فروش فعال دارد و نمی‌توان آن را حذف کرد",
+        description: "خطا در حذف مشتری",
         variant: "destructive",
       });
-      return;
-    }
-
-    if (confirm("آیا از حذف این مشتری اطمینان دارید؟")) {
-      customersStore.delete(id);
-      toast({
-        title: "موفق",
-        description: "مشتری با موفقیت حذف شد",
-      });
-      loadCustomers();
     }
   };
 
   const getCustomerSalesCount = (customerId: string) => {
-    return salesStore.getAll().filter(s => s.customerId === customerId).length;
+    return sales.filter(s => s.customerId === customerId).length;
   };
 
   const getCustomerStats = (customerId: string) => {
-    const sales = salesStore.getAll().filter(s => s.customerId === customerId);
-    const totalPurchases = sales.reduce((sum, s) => sum + s.announcedPrice, 0);
-    let totalPaid = sales.reduce((sum, s) => sum + s.downPayment, 0);
+    const customerSales = sales.filter(s => s.customerId === customerId);
+    const totalPurchases = customerSales.reduce((sum, s) => sum + s.announcedPrice, 0);
+    let totalPaid = customerSales.reduce((sum, s) => sum + s.downPayment, 0);
     
     let totalRemaining = 0;
     let overdueCount = 0;
     let pendingCount = 0;
     
-    sales.forEach(sale => {
-      const installments = installmentsStore.getBySaleId(sale.id);
-      installments.forEach(inst => {
+    customerSales.forEach(sale => {
+      const saleInstallments = installments.filter(i => i.saleId === sale.id);
+      saleInstallments.forEach(inst => {
         if (inst.status !== 'paid') {
           totalRemaining += inst.totalAmount;
           if (inst.status === 'overdue') {

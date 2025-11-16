@@ -25,7 +25,7 @@ import {
   customersStore,
   partnersStore,
   phonesStore,
-} from "@/lib/store";
+} from "@/lib/storeProvider";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
 import { addCapitalFromPayment, addMonthlyProfitToPartners } from "@/lib/profitCalculator";
 import { DollarSign, CheckCircle, Clock, AlertCircle, Trash2, Search, Filter, FileText, CreditCard } from "lucide-react";

@@ -25,7 +25,7 @@ import {
   customersStore,
   phonesStore,
   installmentsStore,
-} from "@/lib/store";
+} from "@/lib/storeProvider";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
 import { 
   calculateInstallments, 

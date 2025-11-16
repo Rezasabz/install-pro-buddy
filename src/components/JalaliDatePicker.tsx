@@ -31,6 +31,8 @@ export function JalaliDatePicker({
   const [viewDate, setViewDate] = useState<JalaliDate>(
     value ? dateToJalali(value) : dateToJalali(new Date())
   );
+  const [showYearPicker, setShowYearPicker] = useState(false);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
 
   const selectedJalali = value ? dateToJalali(value) : null;
 
@@ -73,6 +75,10 @@ export function JalaliDatePicker({
 
   const displayValue = value ? formatJalaliShort(dateToJalali(value)) : '';
 
+  // Generate year range (current year ± 10)
+  const currentYear = dateToJalali(new Date()).year;
+  const yearRange = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i);
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
@@ -97,36 +103,101 @@ export function JalaliDatePicker({
               size="icon"
               onClick={handleNextMonth}
               className="h-7 w-7"
+              disabled={showYearPicker || showMonthPicker}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <div className="text-sm font-semibold">
-              {jalaliMonthNames[viewDate.month - 1]} {toPersianDigits(viewDate.year)}
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowMonthPicker(!showMonthPicker);
+                  setShowYearPicker(false);
+                }}
+                className="text-sm font-semibold h-7 px-2"
+              >
+                {jalaliMonthNames[viewDate.month - 1]}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowYearPicker(!showYearPicker);
+                  setShowMonthPicker(false);
+                }}
+                className="text-sm font-semibold h-7 px-2"
+              >
+                {toPersianDigits(viewDate.year)}
+              </Button>
             </div>
             <Button
               variant="ghost"
               size="icon"
               onClick={handlePrevMonth}
               className="h-7 w-7"
+              disabled={showYearPicker || showMonthPicker}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
           </div>
 
-          {/* Days of week */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'].map((day) => (
-              <div
-                key={day}
-                className="text-center text-xs font-medium text-muted-foreground h-7 flex items-center justify-center"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
+          {/* Year Picker */}
+          {showYearPicker && (
+            <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto">
+              {yearRange.map((year) => (
+                <Button
+                  key={year}
+                  variant={year === viewDate.year ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-9"
+                  onClick={() => {
+                    setViewDate({ ...viewDate, year });
+                    setShowYearPicker(false);
+                  }}
+                >
+                  {toPersianDigits(year)}
+                </Button>
+              ))}
+            </div>
+          )}
 
-          {/* Calendar days */}
-          <div className="grid grid-cols-7 gap-1">
+          {/* Month Picker */}
+          {showMonthPicker && (
+            <div className="grid grid-cols-3 gap-2">
+              {jalaliMonthNames.map((month, index) => (
+                <Button
+                  key={month}
+                  variant={index + 1 === viewDate.month ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-9 text-xs"
+                  onClick={() => {
+                    setViewDate({ ...viewDate, month: index + 1 });
+                    setShowMonthPicker(false);
+                  }}
+                >
+                  {month}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          {/* Days of week */}
+          {!showYearPicker && !showMonthPicker && (
+            <>
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'].map((day) => (
+                  <div
+                    key={day}
+                    className="text-center text-xs font-medium text-muted-foreground h-7 flex items-center justify-center"
+                  >
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar days */}
+              <div className="grid grid-cols-7 gap-1">
             {days.map((day, index) => {
               if (day === null) {
                 return <div key={`empty-${index}`} className="h-7" />;
@@ -163,23 +234,27 @@ export function JalaliDatePicker({
                 </Button>
               );
             })}
-          </div>
+              </div>
+            </>
+          )}
 
           {/* Today button */}
-          <div className="mt-3 pt-3 border-t">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-xs"
-              onClick={() => {
-                const today = new Date();
-                onChange(today);
-                setIsOpen(false);
-              }}
-            >
-              امروز
-            </Button>
-          </div>
+          {!showYearPicker && !showMonthPicker && (
+            <div className="mt-3 pt-3 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs"
+                onClick={() => {
+                  const today = new Date();
+                  onChange(today);
+                  setIsOpen(false);
+                }}
+              >
+                امروز
+              </Button>
+            </div>
+          )}
         </div>
       </PopoverContent>
     </Popover>
