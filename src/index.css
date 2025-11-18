@@ -233,3 +233,89 @@ All colors MUST be HSL.
     direction: rtl;
   }
 }
+
+
+/* بهبود استایل فرم‌ها و Modal ها */
+@layer components {
+  /* فرم‌های راستچین */
+  form {
+    @apply text-right;
+  }
+
+  /* Label های زیباتر */
+  label {
+    @apply text-sm font-semibold text-foreground/90 mb-2 block;
+  }
+
+  /* Input های بهتر */
+  input[type="text"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="password"],
+  textarea,
+  select {
+    @apply transition-all duration-200;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    @apply ring-2 ring-primary/20 border-primary;
+  }
+
+  /* Dialog Content بهتر */
+  [role="dialog"] {
+    @apply backdrop-blur-sm;
+  }
+
+  /* فرم spacing بهتر */
+  form > div {
+    @apply space-y-2;
+  }
+
+  /* Button های فرم */
+  form button[type="submit"] {
+    @apply mt-6 h-12 text-base font-semibold shadow-lg hover:shadow-xl transition-all;
+  }
+
+  /* Preview boxes */
+  .preview-box {
+    @apply p-5 bg-gradient-to-br from-muted/50 to-muted rounded-xl border-2 border-border/50 shadow-sm;
+  }
+
+  /* Card hover effects */
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-xl hover:scale-[1.02];
+  }
+}
+
+/* انیمیشن‌های بهتر */
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideInFromRight 0.3s ease-out;
+}
+
+.animate-fade-scale {
+  animation: fadeInScale 0.3s ease-out;
+}

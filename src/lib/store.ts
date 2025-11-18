@@ -42,6 +42,8 @@ export interface Customer {
   createdAt: string;
 }
 
+export type ProfitCalculationType = 'fixed_4_percent' | 'monthly_4_percent_lda' | 'custom_annual';
+
 export interface Sale {
   id: string;
   customerId: string;
@@ -50,7 +52,10 @@ export interface Sale {
   purchasePrice: number; // قیمت خرید واقعی گوشی (مثلا 20 میلیون)
   downPayment: number; // پیش‌پرداخت
   installmentMonths: number; // تعداد ماه
+  profitCalculationType: ProfitCalculationType; // نوع محاسبه سود
+  customProfitRate?: number; // درصد سود دلخواه (فقط برای custom_annual)
   monthlyInterestRate: number; // نرخ سود ماهانه (مثلا 0.04 = 4%)
+  totalProfit: number; // کل سود محاسبه شده
   initialProfit: number; // سود اولیه (تفاوت قیمت اعلامی و خرید)
   saleDate: string;
   status: 'active' | 'completed' | 'defaulted';
@@ -69,6 +74,15 @@ export interface Installment {
   status: 'pending' | 'paid' | 'overdue';
 }
 
+export interface Expense {
+  id: string;
+  date: string; // تاریخ هزینه
+  type: string; // نوع هزینه (اجاره، حقوق، تبلیغات، ...)
+  amount: number; // مبلغ هزینه
+  description: string; // توضیحات
+  createdAt: string;
+}
+
 // Storage keys
 const STORAGE_KEYS = {
   PARTNERS: 'partners',
@@ -77,6 +91,7 @@ const STORAGE_KEYS = {
   SALES: 'sales',
   INSTALLMENTS: 'installments',
   TRANSACTIONS: 'transactions',
+  EXPENSES: 'expenses',
 };
 
 // Helper functions
@@ -300,5 +315,65 @@ export const transactionsStore = {
     
     saveToStorage(STORAGE_KEYS.TRANSACTIONS, filtered);
     return true;
+  },
+};
+
+// Expenses
+export const expensesStore = {
+  getAll: (): Expense[] => getFromStorage<Expense>(STORAGE_KEYS.EXPENSES),
+  
+  getById: (id: string): Expense | undefined => {
+    return expensesStore.getAll().find(e => e.id === id);
+  },
+  
+  add: (expense: Omit<Expense, 'id' | 'createdAt'>): Expense => {
+    const expenses = expensesStore.getAll();
+    const newExpense: Expense = {
+      ...expense,
+      id: generateUUID(),
+      createdAt: new Date().toISOString(),
+    };
+    expenses.push(newExpense);
+    saveToStorage(STORAGE_KEYS.EXPENSES, expenses);
+    return newExpense;
+  },
+  
+  update: (id: string, updates: Partial<Omit<Expense, 'id' | 'createdAt'>>): boolean => {
+    const expenses = expensesStore.getAll();
+    const index = expenses.findIndex(e => e.id === id);
+    if (index === -1) return false;
+    
+    expenses[index] = { ...expenses[index], ...updates };
+    saveToStorage(STORAGE_KEYS.EXPENSES, expenses);
+    return true;
+  },
+  
+  delete: (id: string): boolean => {
+    const expenses = expensesStore.getAll();
+    const filtered = expenses.filter(e => e.id !== id);
+    if (filtered.length === expenses.length) return false;
+    
+    saveToStorage(STORAGE_KEYS.EXPENSES, filtered);
+    return true;
+  },
+  
+  // فیلتر بر اساس تاریخ
+  getByDateRange: (startDate: string, endDate: string): Expense[] => {
+    return expensesStore.getAll().filter(e => {
+      const expenseDate = new Date(e.date);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      return expenseDate >= start && expenseDate <= end;
+    });
+  },
+  
+  // فیلتر بر اساس نوع
+  getByType: (type: string): Expense[] => {
+    return expensesStore.getAll().filter(e => e.type === type);
+  },
+  
+  // مجموع هزینه‌ها
+  getTotalAmount: (): number => {
+    return expensesStore.getAll().reduce((sum, e) => sum + e.amount, 0);
   },
 };

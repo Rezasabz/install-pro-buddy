@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
+import { useDataContext } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,10 +22,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { customersStore, Customer, salesStore, installmentsStore, phonesStore, Sale, Installment } from "@/lib/storeProvider";
+import { customersStore, Customer, salesStore, installmentsStore, phonesStore, Sale, Installment, Phone as PhoneType } from "@/lib/storeProvider";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
 import { Plus, Edit, Trash2, Users, Phone, IdCard, Search, FileText, AlertCircle, CheckCircle, DollarSign, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { PDFButton } from "@/components/PDFButton";
 
 const Customers = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -41,7 +44,10 @@ const Customers = () => {
     nationalId: "",
     address: "",
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const { toast } = useToast();
+  const { refreshCustomers } = useDataContext();
 
   const loadCustomers = async () => {
     try {
@@ -111,6 +117,11 @@ const Customers = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // بستن dialog و نمایش loading
+    setIsDialogOpen(false);
+    setIsLoading(true);
+    setLoadingMessage(editingCustomer ? "در حال بروزرسانی مشتری..." : "در حال افزودن مشتری...");
+
     try {
       if (editingCustomer) {
         await customersStore.update(editingCustomer.id, formData);
@@ -128,8 +139,10 @@ const Customers = () => {
 
       setFormData({ name: "", phone: "", nationalId: "", address: "" });
       setEditingCustomer(null);
-      setIsDialogOpen(false);
-      loadCustomers();
+      await loadCustomers();
+      
+      // Refresh customers in other pages (like Sales)
+      refreshCustomers();
     } catch (error) {
       console.error('Error saving customer:', error);
       toast({
@@ -137,6 +150,9 @@ const Customers = () => {
         description: "خطا در ذخیره مشتری",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage("");
     }
   };
 
@@ -225,6 +241,7 @@ const Customers = () => {
 
   return (
     <Layout>
+      {isLoading && <LoadingOverlay message={loadingMessage} />}
       <div className="space-y-6">
         <div className="flex justify-between items-start">
           <div>

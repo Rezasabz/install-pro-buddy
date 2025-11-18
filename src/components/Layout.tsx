@@ -1,5 +1,5 @@
-import { ReactNode, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { ReactNode, useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
@@ -12,40 +12,24 @@ import {
   X,
   Moon,
   Sun,
+  User as UserIcon,
+  Receipt,
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface LayoutProps {
   children: ReactNode;
 }
 
-interface User {
-  id: string;
-}
-
 const Layout = ({ children }: LayoutProps) => {
-  const [user, setUser] = useState<User | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
-
-  useEffect(() => {
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    if (isLoggedIn !== "true") {
-      navigate("/auth");
-    } else {
-      setUser({ id: "local-user" } as User);
-    }
-  }, [navigate]);
+  const { user, logout } = useAuth();
 
   const handleSignOut = () => {
-    localStorage.removeItem("isLoggedIn");
-    navigate("/auth");
+    logout();
   };
-
-  if (!user) {
-    return null;
-  }
 
   const navigation = [
     { name: "داشبورد", href: "/", icon: LayoutDashboard },
@@ -54,6 +38,7 @@ const Layout = ({ children }: LayoutProps) => {
     { name: "فروش", href: "/sales", icon: ShoppingCart },
     { name: "مشتریان", href: "/customers", icon: Users },
     { name: "اقساط", href: "/installments", icon: DollarSign },
+    { name: "هزینه‌ها", href: "/expenses", icon: Receipt },
   ];
 
   return (
@@ -78,6 +63,12 @@ const Layout = ({ children }: LayoutProps) => {
                 </Link>
               );
             })}
+            {user && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-muted rounded-md">
+                <UserIcon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{user.fullName}</span>
+              </div>
+            )}
             <Button
               variant="ghost"
               size="icon"

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
+import { useDataContext } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,9 @@ import {
   customersStore,
   partnersStore,
   phonesStore,
+  Sale,
+  Customer,
+  Phone,
 } from "@/lib/storeProvider";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
 import { addCapitalFromPayment, addMonthlyProfitToPartners } from "@/lib/profitCalculator";
@@ -34,6 +38,9 @@ import { useToast } from "@/hooks/use-toast";
 const Installments = () => {
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [filteredInstallments, setFilteredInstallments] = useState<Installment[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [phones, setPhones] = useState<Phone[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedSaleId, setSelectedSaleId] = useState<string>("");
@@ -41,34 +48,70 @@ const Installments = () => {
   const [bulkPaymentDialog, setBulkPaymentDialog] = useState<{ open: boolean; saleId: string }>({ open: false, saleId: '' });
   const [selectedInstallments, setSelectedInstallments] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  const { refreshPartners, refreshDashboard } = useDataContext();
+
+  const loadInstallments = async () => {
+    try {
+      const [installmentsData, salesData, customersData, phonesData] = await Promise.all([
+        installmentsStore.getAll(),
+        salesStore.getAll(),
+        customersStore.getAll(),
+        phonesStore.getAll(),
+      ]);
+      
+      // بروزرسانی وضعیت اقساط معوق
+      const today = new Date();
+      for (const inst of installmentsData) {
+        if (inst.status === 'pending' && new Date(inst.dueDate) < today) {
+          await installmentsStore.update(inst.id, { status: 'overdue' });
+        }
+      }
+
+      // دوباره بارگذاری بعد از بروزرسانی
+      const updatedInstallments = await installmentsStore.getAll();
+      
+      // مرتب‌سازی بر اساس تاریخ سررسید
+      const sorted = updatedInstallments.sort((a, b) => 
+        new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+      );
+      
+      setInstallments(sorted);
+      setSales(salesData);
+      setCustomers(customersData);
+      setPhones(phonesData);
+    } catch (error) {
+      console.error('Error loading installments:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در بارگذاری اقساط",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     loadInstallments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Listen for refresh events
+  useEffect(() => {
+    const handleRefreshInstallments = () => {
+      loadInstallments();
+    };
+
+    window.addEventListener('refreshInstallments', handleRefreshInstallments);
+    
+    return () => {
+      window.removeEventListener('refreshInstallments', handleRefreshInstallments);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     applyFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [installments, searchQuery, statusFilter, selectedSaleId]);
-
-  const loadInstallments = () => {
-    const allInstallments = installmentsStore.getAll();
-    
-    // بروزرسانی وضعیت اقساط معوق
-    const today = new Date();
-    allInstallments.forEach(inst => {
-      if (inst.status === 'pending' && new Date(inst.dueDate) < today) {
-        installmentsStore.update(inst.id, { status: 'overdue' });
-      }
-    });
-
-    // مرتب‌سازی بر اساس تاریخ سررسید
-    const sorted = installmentsStore.getAll().sort((a, b) => 
-      new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-    );
-    
-    setInstallments(sorted);
-  };
 
   const applyFilters = () => {
     let filtered = [...installments];
@@ -86,9 +129,9 @@ const Installments = () => {
     // جستجو در نام مشتری
     if (searchQuery) {
       filtered = filtered.filter(i => {
-        const sale = salesStore.getAll().find(s => s.id === i.saleId);
+        const sale = sales.find(s => s.id === i.saleId);
         if (!sale) return false;
-        const customer = customersStore.getAll().find(c => c.id === sale.customerId);
+        const customer = customers.find(c => c.id === sale.customerId);
         return customer?.name.toLowerCase().includes(searchQuery.toLowerCase());
       });
     }
@@ -96,85 +139,111 @@ const Installments = () => {
     setFilteredInstallments(filtered);
   };
 
-  const handlePayment = (installmentId: string) => {
-    const installment = installmentsStore.getAll().find(i => i.id === installmentId);
+  const handlePayment = async (installmentId: string) => {
+    const installment = installments.find(i => i.id === installmentId);
     if (!installment) return;
 
-    // ثبت پرداخت
-    installmentsStore.update(installmentId, {
-      status: 'paid',
-      paidDate: new Date().toISOString(),
-    });
-
-    // بازگشت اصل بدهی به سرمایه
-    addCapitalFromPayment(installment.principalAmount);
-
-    // افزودن سود ماهانه به حساب شرکا
-    addMonthlyProfitToPartners(installment.interestAmount);
-
-    // بررسی اینکه آیا همه اقساط پرداخت شده‌اند
-    const saleInstallments = installmentsStore.getBySaleId(installment.saleId);
-    const allPaid = saleInstallments.every(i => i.status === 'paid');
-    
-    if (allPaid) {
-      salesStore.update(installment.saleId, { status: 'completed' });
-      toast({
-        title: "تبریک!",
-        description: `تمام اقساط پرداخت شد. اصل: ${formatCurrency(installment.principalAmount)} به سرمایه بازگشت. سود: ${formatCurrency(installment.interestAmount)}`,
+    try {
+      // ثبت پرداخت
+      await installmentsStore.update(installmentId, {
+        status: 'paid',
+        paidDate: new Date().toISOString(),
       });
-    } else {
+
+      // بازگشت اصل بدهی به سرمایه
+      await addCapitalFromPayment(installment.principalAmount);
+
+      // افزودن سود ماهانه به حساب شرکا
+      await addMonthlyProfitToPartners(installment.interestAmount);
+
+      // بررسی اینکه آیا همه اقساط پرداخت شده‌اند
+      const saleInstallments = installments.filter(i => i.saleId === installment.saleId);
+      const allPaid = saleInstallments.every(i => i.id === installmentId || i.status === 'paid');
+      
+      if (allPaid) {
+        await salesStore.update(installment.saleId, { status: 'completed' });
+        toast({
+          title: "تبریک!",
+          description: `تمام اقساط پرداخت شد. اصل: ${formatCurrency(installment.principalAmount)} به سرمایه بازگشت. سود: ${formatCurrency(installment.interestAmount)}`,
+        });
+      } else {
+        toast({
+          title: "موفق",
+          description: `قسط پرداخت شد. اصل: ${formatCurrency(installment.principalAmount)} به سرمایه بازگشت. سود: ${formatCurrency(installment.interestAmount)}`,
+        });
+      }
+
+      await loadInstallments();
+      
+      // Refresh partners and dashboard because capital and profit were updated
+      refreshPartners();
+      refreshDashboard();
+    } catch (error) {
+      console.error('Error processing payment:', error);
       toast({
-        title: "موفق",
-        description: `قسط پرداخت شد. اصل: ${formatCurrency(installment.principalAmount)} به سرمایه بازگشت. سود: ${formatCurrency(installment.interestAmount)}`,
+        title: "خطا",
+        description: "خطا در ثبت پرداخت",
+        variant: "destructive",
       });
     }
-
-    loadInstallments();
   };
 
-  const handleCancelPayment = (installmentId: string) => {
-    const installment = installmentsStore.getAll().find(i => i.id === installmentId);
+  const handleCancelPayment = async (installmentId: string) => {
+    const installment = installments.find(i => i.id === installmentId);
     if (!installment || installment.status !== 'paid') return;
 
     if (!confirm("⚠️ آیا از لغو این پرداخت اطمینان دارید؟\n\nسرمایه و سود به حالت قبل برمی‌گردند.")) {
       return;
     }
 
-    // لغو پرداخت
-    installmentsStore.update(installmentId, {
-      status: 'pending',
-      paidDate: undefined,
-    });
-
-    // کسر اصل از سرمایه (برعکس عملیات پرداخت)
-    const partners = partnersStore.getAll();
-    const totalCapital = partners.reduce((sum, p) => sum + p.capital, 0);
-    partners.forEach(partner => {
-      const share = totalCapital > 0 ? partner.capital / totalCapital : 0;
-      const deduction = Math.round(installment.principalAmount * share);
-      partnersStore.update(partner.id, {
-        availableCapital: partner.availableCapital - deduction,
+    try {
+      // لغو پرداخت
+      await installmentsStore.update(installmentId, {
+        status: 'pending',
+        paidDate: undefined,
       });
-    });
 
-    // کسر سود ماهانه از حساب شرکا
-    partners.forEach(partner => {
-      const share = totalCapital > 0 ? partner.capital / totalCapital : 0;
-      const profitDeduction = Math.round(installment.interestAmount * share);
-      partnersStore.update(partner.id, {
-        monthlyProfit: partner.monthlyProfit - profitDeduction,
+      // کسر اصل از سرمایه (برعکس عملیات پرداخت)
+      const partners = await partnersStore.getAll();
+      const totalCapital = partners.reduce((sum, p) => sum + p.capital, 0);
+      for (const partner of partners) {
+        const share = totalCapital > 0 ? partner.capital / totalCapital : 0;
+        const deduction = Math.round(installment.principalAmount * share);
+        await partnersStore.update(partner.id, {
+          availableCapital: partner.availableCapital - deduction,
+        });
+      }
+
+      // کسر سود ماهانه از حساب شرکا
+      for (const partner of partners) {
+        const share = totalCapital > 0 ? partner.capital / totalCapital : 0;
+        const profitDeduction = Math.round(installment.interestAmount * share);
+        await partnersStore.update(partner.id, {
+          monthlyProfit: partner.monthlyProfit - profitDeduction,
+        });
+      }
+
+      // بروزرسانی وضعیت فروش
+      await salesStore.update(installment.saleId, { status: 'active' });
+
+      toast({
+        title: "لغو شد",
+        description: "پرداخت قسط لغو شد و تغییرات برگشت داده شد",
       });
-    });
 
-    // بروزرسانی وضعیت فروش
-    salesStore.update(installment.saleId, { status: 'active' });
-
-    toast({
-      title: "لغو شد",
-      description: "پرداخت قسط لغو شد و تغییرات برگشت داده شد",
-    });
-
-    loadInstallments();
+      await loadInstallments();
+      
+      // Refresh partners and dashboard because payment was cancelled
+      refreshPartners();
+      refreshDashboard();
+    } catch (error) {
+      console.error('Error canceling payment:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در لغو پرداخت",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleBulkPayment = () => {
@@ -188,7 +257,7 @@ const Installments = () => {
     }
 
     const installmentsToPayArray = Array.from(selectedInstallments)
-      .map(id => installmentsStore.getAll().find(i => i.id === id))
+      .map(id => installments.find(i => i.id === id))
       .filter(i => i && i.status !== 'paid') as Installment[];
 
     if (installmentsToPayArray.length === 0) {
@@ -232,11 +301,11 @@ const Installments = () => {
   };
 
   const getInstallmentDetails = (installment: Installment) => {
-    const sale = salesStore.getAll().find(s => s.id === installment.saleId);
+    const sale = sales.find(s => s.id === installment.saleId);
     if (!sale) return null;
 
-    const customer = customersStore.getAll().find(c => c.id === sale.customerId);
-    const saleInstallments = installmentsStore.getBySaleId(sale.id);
+    const customer = customers.find(c => c.id === sale.customerId);
+    const saleInstallments = installments.filter(i => i.saleId === sale.id);
 
     return {
       customer,
@@ -263,7 +332,7 @@ const Installments = () => {
     return acc;
   }, {} as Record<string, Installment[]>);
 
-  const uniqueSales = salesStore.getAll().filter(sale => 
+  const uniqueSales = sales.filter(sale => 
     installments.some(i => i.saleId === sale.id)
   );
 
@@ -324,7 +393,7 @@ const Installments = () => {
                   <SelectContent>
                     <SelectItem value="all_sales">همه فروش‌ها</SelectItem>
                     {uniqueSales.map(sale => {
-                      const customer = customersStore.getAll().find(c => c.id === sale.customerId);
+                      const customer = customers.find(c => c.id === sale.customerId);
                       return (
                         <SelectItem key={sale.id} value={sale.id}>
                           {customer?.name} - {formatCurrency(sale.announcedPrice)}
@@ -358,12 +427,12 @@ const Installments = () => {
               <DialogTitle>جزئیات فروش و اقساط</DialogTitle>
             </DialogHeader>
             {(() => {
-              const sale = salesStore.getAll().find(s => s.id === saleDetailsDialog.saleId);
+              const sale = sales.find(s => s.id === saleDetailsDialog.saleId);
               if (!sale) return null;
 
-              const customer = customersStore.getAll().find(c => c.id === sale.customerId);
-              const phone = phonesStore.getAll().find(p => p.id === sale.phoneId);
-              const saleInstallments = installmentsStore.getBySaleId(sale.id).sort((a, b) => a.installmentNumber - b.installmentNumber);
+              const customer = customers.find(c => c.id === sale.customerId);
+              const phone = phones.find(p => p.id === sale.phoneId);
+              const saleInstallments = installments.filter(i => i.saleId === sale.id).sort((a, b) => a.installmentNumber - b.installmentNumber);
               const paidCount = saleInstallments.filter(i => i.status === 'paid').length;
 
               return (
@@ -450,12 +519,12 @@ const Installments = () => {
               <DialogTitle>پرداخت چند قسط یکجا</DialogTitle>
             </DialogHeader>
             {(() => {
-              const sale = salesStore.getAll().find(s => s.id === bulkPaymentDialog.saleId);
+              const sale = sales.find(s => s.id === bulkPaymentDialog.saleId);
               if (!sale) return null;
 
-              const customer = customersStore.getAll().find(c => c.id === sale.customerId);
-              const saleInstallments = installmentsStore.getBySaleId(sale.id)
-                .filter(i => i.status !== 'paid')
+              const customer = customers.find(c => c.id === sale.customerId);
+              const saleInstallments = installments
+                .filter(i => i.saleId === sale.id && i.status !== 'paid')
                 .sort((a, b) => a.installmentNumber - b.installmentNumber);
 
               const selectedArray = Array.from(selectedInstallments)
@@ -613,11 +682,11 @@ const Installments = () => {
         {/* نمایش گروه‌بندی شده بر اساس فروش */}
         <div className="space-y-6">
           {Object.entries(groupedBySale).map(([saleId, saleInstallments]) => {
-            const sale = salesStore.getAll().find(s => s.id === saleId);
+            const sale = sales.find(s => s.id === saleId);
             if (!sale) return null;
 
-            const customer = customersStore.getAll().find(c => c.id === sale.customerId);
-            const phone = phonesStore.getAll().find(p => p.id === sale.phoneId);
+            const customer = customers.find(c => c.id === sale.customerId);
+            const phone = phones.find(p => p.id === sale.phoneId);
             const paidCount = saleInstallments.filter(i => i.status === 'paid').length;
             const unpaidInstallments = saleInstallments.filter(i => i.status !== 'paid');
 

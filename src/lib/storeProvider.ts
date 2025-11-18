@@ -8,6 +8,8 @@ export type {
   Customer,
   Sale,
   Installment,
+  Expense,
+  ProfitCalculationType,
 } from './apiStore';
 
 // Direct export of API stores - no localStorage fallback
@@ -17,6 +19,7 @@ export const customersStore = apiStore.customersStore;
 export const salesStore = apiStore.salesStore;
 export const installmentsStore = apiStore.installmentsStore;
 export const transactionsStore = apiStore.transactionsStore;
+export const expensesStore = apiStore.expensesStore;
 
 // Health check
 export const checkApiHealth = apiStore.checkApiHealth;

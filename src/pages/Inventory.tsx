@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
+import { useDataContext } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -37,11 +39,10 @@ const Inventory = () => {
     sellingPrice: "",
   });
   const [purchaseDate, setPurchaseDate] = useState<Date>(new Date());
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const { toast } = useToast();
-
-  useEffect(() => {
-    loadPhones();
-  }, []);
+  const { refreshPhones } = useDataContext();
 
   const loadPhones = async () => {
     try {
@@ -56,6 +57,11 @@ const Inventory = () => {
       });
     }
   };
+
+  useEffect(() => {
+    loadPhones();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +86,11 @@ const Inventory = () => {
       });
       return;
     }
+
+    // بستن dialog و نمایش loading
+    setIsDialogOpen(false);
+    setIsLoading(true);
+    setLoadingMessage(editingPhone ? "در حال بروزرسانی گوشی..." : "در حال افزودن گوشی...");
 
     try {
       if (editingPhone) {
@@ -120,15 +131,22 @@ const Inventory = () => {
       });
       setPurchaseDate(new Date());
       setEditingPhone(null);
-      setIsDialogOpen(false);
-      loadPhones();
-    } catch (error) {
+      await loadPhones();
+      
+      // Refresh phones in other pages (like Sales)
+      refreshPhones();
+    } catch (error: unknown) {
       console.error('Error saving phone:', error);
+      const { extractErrorMessage } = await import('@/lib/errorHandler');
+      
       toast({
         title: "خطا",
-        description: "خطا در ذخیره گوشی",
+        description: extractErrorMessage(error, "خطا در ذخیره گوشی"),
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage("");
     }
   };
 
@@ -171,6 +189,7 @@ const Inventory = () => {
 
   return (
     <Layout>
+      {isLoading && <LoadingOverlay message={loadingMessage} />}
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

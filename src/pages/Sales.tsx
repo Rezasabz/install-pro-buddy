@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
+import { useDataContext } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -25,8 +27,16 @@ import {
   customersStore,
   phonesStore,
   installmentsStore,
+  partnersStore,
+  Customer,
+  Phone,
+  Installment,
+  Partner,
+  ProfitCalculationType,
 } from "@/lib/storeProvider";
+import { calculateProfit, getProfitCalculationLabel } from "@/lib/profitCalculations";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
+import { PDFButton } from "@/components/PDFButton";
 import { 
   calculateInstallments, 
   checkCapitalAvailability,
@@ -38,6 +48,12 @@ import { useToast } from "@/hooks/use-toast";
 
 const Sales = () => {
   const [sales, setSales] = useState<Sale[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [phones, setPhones] = useState<Phone[]>([]);
+  const [installments, setInstallments] = useState<Installment[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; saleId: string }>({ open: false, saleId: '' });
   const [formData, setFormData] = useState({
@@ -46,6 +62,8 @@ const Sales = () => {
     announcedPrice: "", // قیمت اعلام شده به مشتری
     downPayment: "",
     installmentMonths: "6",
+    profitCalculationType: "fixed_4_percent" as "fixed_4_percent" | "monthly_4_percent_lda" | "custom_annual",
+    customProfitRate: "8",
   });
   const [preview, setPreview] = useState({
     remainingDebt: 0,
@@ -60,17 +78,60 @@ const Sales = () => {
     initialProfit: 0,
   });
   const { toast } = useToast();
+  const { refreshPartners, refreshDashboard, refreshPhones, refreshCustomers, refreshInstallments } = useDataContext();
 
-  const customers = customersStore.getAll();
-  const availablePhones = phonesStore.getAll().filter(p => p.status === 'available');
-  const allPhones = phonesStore.getAll();
+  const availablePhones = phones.filter(p => p.status === 'available');
+
+  const loadSales = async () => {
+    try {
+      const [salesData, customersData, phonesData, installmentsData, partnersData] = await Promise.all([
+        salesStore.getAll(),
+        customersStore.getAll(),
+        phonesStore.getAll(),
+        installmentsStore.getAll(),
+        partnersStore.getAll(),
+      ]);
+      setSales(salesData);
+      setCustomers(customersData);
+      setPhones(phonesData);
+      setInstallments(installmentsData);
+      setPartners(partnersData);
+    } catch (error) {
+      console.error('Error loading sales:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در بارگذاری فروش‌ها",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     loadSales();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Listen for refresh events from other pages
+  useEffect(() => {
+    const handleRefreshPhones = () => {
+      phonesStore.getAll().then(setPhones);
+    };
+
+    const handleRefreshCustomers = () => {
+      customersStore.getAll().then(setCustomers);
+    };
+
+    window.addEventListener('refreshPhones', handleRefreshPhones);
+    window.addEventListener('refreshCustomers', handleRefreshCustomers);
+    
+    return () => {
+      window.removeEventListener('refreshPhones', handleRefreshPhones);
+      window.removeEventListener('refreshCustomers', handleRefreshCustomers);
+    };
   }, []);
 
   useEffect(() => {
-    // محاسبه پیش‌نمایش
+    // محاسبه پیش‌نمایش با سیستم جدید
     if (formData.phoneId && formData.announcedPrice && formData.downPayment && formData.installmentMonths) {
       const phone = availablePhones.find(p => p.id === formData.phoneId);
       if (!phone) return;
@@ -80,49 +141,71 @@ const Sales = () => {
       const downPayment = parseFloat(formData.downPayment) || 0;
       const installmentMonths = parseInt(formData.installmentMonths);
 
-      if (announcedPrice > 0 && downPayment < announcedPrice) {
+      if (announcedPrice > 0 && downPayment < announcedPrice && installmentMonths >= 2) {
         const remainingDebt = announcedPrice - downPayment;
-        const installments = calculateInstallments(remainingDebt, installmentMonths);
-        const totalInterest = installments.reduce((sum, inst) => sum + inst.interestAmount, 0);
+        const customRate = formData.profitCalculationType === 'custom_annual' 
+          ? parseFloat(formData.customProfitRate) || 8 
+          : undefined;
+        
+        const result = calculateProfit(
+          remainingDebt,
+          installmentMonths,
+          formData.profitCalculationType,
+          customRate
+        );
+        
         const initialProfit = announcedPrice - purchasePrice;
 
         setPreview({
           remainingDebt,
-          installments,
-          totalInterest,
+          installments: result.installments,
+          totalInterest: result.totalProfit,
           initialProfit,
         });
       }
     }
-  }, [formData.phoneId, formData.announcedPrice, formData.downPayment, formData.installmentMonths, availablePhones]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    formData.phoneId, 
+    formData.announcedPrice, 
+    formData.downPayment, 
+    formData.installmentMonths,
+    formData.profitCalculationType,
+    formData.customProfitRate
+  ]);
 
-  const loadSales = () => {
-    setSales(salesStore.getAll());
-  };
-
-  const handleDeleteSale = (saleId: string) => {
+  const handleDeleteSale = async (saleId: string) => {
     if (!confirm("⚠️ هشدار: با حذف این فروش، تمام اقساط مرتبط نیز حذف می‌شوند.\n\nآیا مطمئن هستید؟")) {
       return;
     }
 
-    // حذف اقساط مرتبط
-    const saleInstallments = installmentsStore.getBySaleId(saleId);
-    saleInstallments.forEach(inst => {
-      installmentsStore.delete(inst.id);
-    });
+    try {
+      // حذف اقساط مرتبط
+      const saleInstallments = await installmentsStore.getBySaleId(saleId);
+      for (const inst of saleInstallments) {
+        await installmentsStore.delete(inst.id);
+      }
 
-    // حذف فروش
-    salesStore.delete(saleId);
+      // حذف فروش
+      await salesStore.delete(saleId);
 
-    toast({
-      title: "موفق",
-      description: "فروش و اقساط مرتبط با موفقیت حذف شدند",
-    });
+      toast({
+        title: "موفق",
+        description: "فروش و اقساط مرتبط با موفقیت حذف شدند",
+      });
 
-    loadSales();
+      loadSales();
+    } catch (error) {
+      console.error('Error deleting sale:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در حذف فروش",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const phone = availablePhones.find(p => p.id === formData.phoneId);
@@ -169,7 +252,7 @@ const Sales = () => {
     }
 
     // بررسی موجودی سرمایه
-    const capitalCheck = checkCapitalAvailability(purchasePrice);
+    const capitalCheck = checkCapitalAvailability(purchasePrice, partners);
     if (!capitalCheck.isAvailable) {
       toast({
         title: "سرمایه ناکافی",
@@ -179,72 +262,135 @@ const Sales = () => {
       return;
     }
 
-    const remainingDebt = announcedPrice - downPayment;
-    const installments = calculateInstallments(remainingDebt, installmentMonths);
-    const initialProfit = announcedPrice - purchasePrice;
-
-    // ایجاد فروش
-    const newSale = salesStore.add({
-      customerId: formData.customerId,
-      phoneId: formData.phoneId,
-      announcedPrice,
-      purchasePrice,
-      downPayment,
-      installmentMonths,
-      monthlyInterestRate: 0.04,
-      initialProfit,
-      saleDate: new Date().toISOString(),
-      status: 'active',
-    });
-
-    // تغییر وضعیت گوشی به فروخته شده
-    phonesStore.update(formData.phoneId, { status: 'sold' });
-
-    // ایجاد اقساط
-    const today = new Date();
-    installments.forEach((inst) => {
-      const dueDate = new Date(today);
-      dueDate.setMonth(dueDate.getMonth() + inst.installmentNumber);
-      
-      installmentsStore.add({
-        saleId: newSale.id,
-        installmentNumber: inst.installmentNumber,
-        principalAmount: inst.principalAmount,
-        interestAmount: inst.interestAmount,
-        totalAmount: inst.totalAmount,
-        remainingDebt: inst.remainingDebt,
-        dueDate: dueDate.toISOString(),
-        status: 'pending',
-      });
-    });
-
-    // کاهش سرمایه در دسترس
-    deductCapitalForPurchase(purchasePrice);
-
-    // ثبت سود اولیه
-    addInitialProfitToPartners(initialProfit);
-
-    toast({
-      title: "موفق",
-      description: `فروش ثبت شد. سرمایه ${formatCurrency(purchasePrice)} کسر و سود اولیه ${formatCurrency(initialProfit)} ثبت شد.`,
-    });
-
-    setFormData({
-      customerId: "",
-      phoneId: "",
-      announcedPrice: "",
-      downPayment: "",
-      installmentMonths: "6",
-    });
+    // بستن dialog و نمایش loading
     setIsDialogOpen(false);
-    loadSales();
+    setIsLoading(true);
+    setLoadingMessage("در حال ثبت فروش...");
+    
+    // اعتبارسنجی تعداد اقساط
+    if (installmentMonths < 2 || installmentMonths > 36) {
+      setIsLoading(false);
+      setLoadingMessage("");
+      toast({
+        title: "خطا",
+        description: "تعداد اقساط باید بین ۲ تا ۳۶ ماه باشد",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // اعتبارسنجی سود دلخواه
+    if (formData.profitCalculationType === 'custom_annual') {
+      const customRate = parseFloat(formData.customProfitRate);
+      if (isNaN(customRate) || customRate < 8) {
+        setIsLoading(false);
+        setLoadingMessage("");
+        toast({
+          title: "خطا",
+          description: "درصد سود دلخواه باید حداقل ۸٪ باشد",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    try {
+      const remainingDebt = announcedPrice - downPayment;
+      const customRate = formData.profitCalculationType === 'custom_annual' 
+        ? parseFloat(formData.customProfitRate) 
+        : undefined;
+      
+      const profitResult = calculateProfit(
+        remainingDebt,
+        installmentMonths,
+        formData.profitCalculationType,
+        customRate
+      );
+      
+      const initialProfit = announcedPrice - purchasePrice;
+
+      // ایجاد فروش
+      const newSale = await salesStore.add({
+        customerId: formData.customerId,
+        phoneId: formData.phoneId,
+        announcedPrice,
+        purchasePrice,
+        downPayment,
+        installmentMonths,
+        profitCalculationType: formData.profitCalculationType,
+        customProfitRate: customRate,
+        monthlyInterestRate: 0.04, // برای سازگاری با کد قدیمی
+        totalProfit: profitResult.totalProfit,
+        initialProfit,
+        saleDate: new Date().toISOString(),
+        status: 'active',
+      });
+
+      // تغییر وضعیت گوشی به فروخته شده
+      await phonesStore.update(formData.phoneId, { status: 'sold' });
+
+      // ایجاد اقساط
+      const today = new Date();
+      for (const inst of profitResult.installments) {
+        const dueDate = new Date(today);
+        dueDate.setMonth(dueDate.getMonth() + inst.installmentNumber);
+        
+        await installmentsStore.add({
+          saleId: newSale.id,
+          installmentNumber: inst.installmentNumber,
+          principalAmount: inst.principalAmount,
+          interestAmount: inst.interestAmount,
+          totalAmount: inst.totalAmount,
+          remainingDebt: inst.remainingDebt,
+          dueDate: dueDate.toISOString(),
+          status: 'pending',
+        });
+      }
+
+      // کاهش سرمایه در دسترس
+      await deductCapitalForPurchase(purchasePrice);
+
+      // ثبت سود اولیه
+      await addInitialProfitToPartners(initialProfit);
+
+      toast({
+        title: "موفق",
+        description: `فروش ثبت شد. سرمایه ${formatCurrency(purchasePrice)} کسر و سود اولیه ${formatCurrency(initialProfit)} ثبت شد.`,
+      });
+
+      setFormData({
+        customerId: "",
+        phoneId: "",
+        announcedPrice: "",
+        downPayment: "",
+        installmentMonths: "6",
+        profitCalculationType: "fixed_4_percent",
+        customProfitRate: "8",
+      });
+      await loadSales();
+      
+      // Refresh partners, dashboard, and installments
+      refreshPartners();
+      refreshDashboard();
+      refreshInstallments();
+    } catch (error) {
+      console.error('Error creating sale:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در ثبت فروش",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage("");
+    }
   };
 
   const getSaleDetails = (sale: Sale) => {
     const customer = customers.find(c => c.id === sale.customerId);
-    const phone = allPhones.find(p => p.id === sale.phoneId);
-    const installments = installmentsStore.getBySaleId(sale.id);
-    const paidInstallments = installments.filter(i => i.status === 'paid');
+    const phone = phones.find(p => p.id === sale.phoneId);
+    const saleInstallments = installments.filter(i => i.saleId === sale.id);
+    const paidInstallments = saleInstallments.filter(i => i.status === 'paid');
     
     const paidPrincipal = paidInstallments.reduce((sum, i) => sum + i.principalAmount, 0);
     const paidInterest = paidInstallments.reduce((sum, i) => sum + i.interestAmount, 0);
@@ -255,11 +401,12 @@ const Sales = () => {
     return {
       customer,
       phone,
+      installments: saleInstallments,
       paidAmount,
       remainingDebt,
       paidInterest,
       paidCount: paidInstallments.length,
-      totalCount: installments.length,
+      totalCount: saleInstallments.length,
     };
   };
 
@@ -268,6 +415,7 @@ const Sales = () => {
 
   return (
     <Layout>
+      {isLoading && <LoadingOverlay message={loadingMessage} />}
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -286,6 +434,8 @@ const Sales = () => {
                     announcedPrice: "",
                     downPayment: "",
                     installmentMonths: "6",
+                    profitCalculationType: "fixed_4_percent",
+                    customProfitRate: "8",
                   });
                 }}
                 disabled={customers.length === 0 || availablePhones.length === 0}
@@ -380,24 +530,64 @@ const Sales = () => {
                 </div>
                 <div>
                   <Label htmlFor="installmentMonths">تعداد اقساط (ماه)</Label>
-                  <Select
+                  <Input
+                    id="installmentMonths"
+                    type="number"
+                    min="2"
+                    max="36"
                     value={formData.installmentMonths}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, installmentMonths: value })
+                    onChange={(e) =>
+                      setFormData({ ...formData, installmentMonths: e.target.value })
+                    }
+                    placeholder="حداقل ۲، حداکثر ۳۶"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">حداقل ۲ ماه، حداکثر ۳۶ ماه</p>
+                </div>
+
+                <div>
+                  <Label htmlFor="profitCalculationType">نوع محاسبه سود</Label>
+                  <Select
+                    value={formData.profitCalculationType}
+                    onValueChange={(value: ProfitCalculationType) =>
+                      setFormData({ ...formData, profitCalculationType: value })
                     }
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {[6, 7, 8, 9, 10, 11, 12].map((month) => (
-                        <SelectItem key={month} value={month.toString()}>
-                          {toPersianDigits(month)} ماه
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="fixed_4_percent">
+                        سود ثابت ۴٪ (یک‌بار)
+                      </SelectItem>
+                      <SelectItem value="monthly_4_percent_lda">
+                        سود ماهیانه ۴٪ روی باقیمانده (LDA)
+                      </SelectItem>
+                      <SelectItem value="custom_annual">
+                        سود دلخواه (حداقل ۸٪)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+
+                {formData.profitCalculationType === 'custom_annual' && (
+                  <div>
+                    <Label htmlFor="customProfitRate">درصد سود (حداقل ۸٪)</Label>
+                    <Input
+                      id="customProfitRate"
+                      type="number"
+                      min="8"
+                      step="0.5"
+                      value={formData.customProfitRate}
+                      onChange={(e) =>
+                        setFormData({ ...formData, customProfitRate: e.target.value })
+                      }
+                      placeholder="مثال: ۱۰"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      سود روی کل مبلغ باقیمانده محاسبه می‌شود
+                    </p>
+                  </div>
+                )}
 
                 {preview.installments.length > 0 && (
                   <div className="p-4 bg-muted rounded-lg space-y-3">
@@ -405,31 +595,64 @@ const Sales = () => {
                     
                     <div className="space-y-1">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">سود اولیه:</span>
-                        <span className="font-semibold text-success">{formatCurrency(preview.initialProfit)}</span>
+                        <span className="text-muted-foreground">نوع محاسبه:</span>
+                        <span className="font-semibold text-primary">
+                          {getProfitCalculationLabel(formData.profitCalculationType)}
+                          {formData.profitCalculationType === 'custom_annual' && 
+                            ` (${toPersianDigits(formData.customProfitRate)}٪)`
+                          }
+                        </span>
                       </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">سود اولیه (تفاوت قیمت):</span>
+                        <span className={`font-semibold ${preview.initialProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          {formatCurrency(preview.initialProfit)}
+                        </span>
+                      </div>
+                      {preview.initialProfit < 0 && (
+                        <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
+                          ⚠️ هشدار: قیمت فروش کمتر از قیمت خرید است! این فروش ضرر دارد.
+                        </div>
+                      )}
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">مانده بدهی:</span>
                         <span className="font-semibold">{formatCurrency(preview.remainingDebt)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">مجموع سود ۴٪:</span>
+                        <span className="text-muted-foreground">مجموع سود:</span>
                         <span className="font-semibold text-secondary">{formatCurrency(preview.totalInterest)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">مبلغ هر قسط:</span>
+                        <span className="font-semibold text-primary">
+                          {preview.installments.length > 0 && formatCurrency(preview.installments[0].totalAmount)}
+                        </span>
                       </div>
                     </div>
 
                     <div className="pt-2 border-t">
                       <div className="text-xs font-semibold mb-2">جدول اقساط (نمونه ۳ قسط اول):</div>
-                      <div className="space-y-1">
-                        {preview.installments.slice(0, 3).map((inst) => (
-                          <div key={inst.installmentNumber} className="text-xs flex justify-between">
-                            <span>قسط {toPersianDigits(inst.installmentNumber)}:</span>
-                            <span>
-                              {formatCurrency(inst.principalAmount)} + {formatCurrency(inst.interestAmount)} = 
-                              <span className="font-semibold mr-1">{formatCurrency(inst.totalAmount)}</span>
-                            </span>
-                          </div>
-                        ))}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-right pb-1">قسط</th>
+                              <th className="text-right pb-1">اصل</th>
+                              <th className="text-right pb-1">سود</th>
+                              <th className="text-right pb-1">جمع</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {preview.installments.slice(0, 3).map((inst) => (
+                              <tr key={inst.installmentNumber} className="border-b">
+                                <td className="py-1">{toPersianDigits(inst.installmentNumber)}</td>
+                                <td className="py-1">{formatCurrency(inst.principalAmount)}</td>
+                                <td className="py-1 text-secondary">{formatCurrency(inst.interestAmount)}</td>
+                                <td className="py-1 font-semibold">{formatCurrency(inst.totalAmount)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   </div>
@@ -539,6 +762,14 @@ const Sales = () => {
                       پرداخت شده: {toPersianDigits(details.paidCount)} از {toPersianDigits(details.totalCount)} قسط
                     </div>
                     <div className="flex items-center gap-2">
+                      {details.customer && details.phone && (
+                        <PDFButton
+                          sale={sale}
+                          customer={details.customer}
+                          phone={details.phone}
+                          installments={details.installments}
+                        />
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -581,20 +812,21 @@ const Sales = () => {
               const sale = sales.find(s => s.id === detailsDialog.saleId);
               if (!sale) return null;
               
-              const details = getSaleDetails(sale);
-              const saleInstallments = installmentsStore.getBySaleId(sale.id);
+              const customer = customers.find(c => c.id === sale.customerId);
+              const phone = phones.find(p => p.id === sale.phoneId);
+              const saleInstallments = installments.filter(i => i.saleId === sale.id);
               
               return (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <div className="text-sm text-muted-foreground">مشتری</div>
-                      <div className="font-semibold">{details.customer?.name}</div>
+                      <div className="font-semibold">{customer?.name}</div>
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">گوشی</div>
                       <div className="font-semibold">
-                        {details.phone ? `${details.phone.brand} ${details.phone.model}` : 'نامشخص'}
+                        {phone ? `${phone.brand} ${phone.model}` : 'نامشخص'}
                       </div>
                     </div>
                     <div>

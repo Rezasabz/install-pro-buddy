@@ -3,6 +3,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Types
+export type ProfitCalculationType = 'fixed_4_percent' | 'monthly_4_percent_lda' | 'custom_annual';
 export interface Partner {
   id: string;
   name: string;
@@ -52,7 +53,10 @@ export interface Sale {
   purchasePrice: number;
   downPayment: number;
   installmentMonths: number;
+  profitCalculationType: ProfitCalculationType;
+  customProfitRate?: number;
   monthlyInterestRate: number;
+  totalProfit: number;
   initialProfit: number;
   saleDate: string;
   status: 'active' | 'completed' | 'defaulted';
@@ -69,6 +73,15 @@ export interface Installment {
   dueDate: string;
   paidDate?: string;
   status: 'pending' | 'paid' | 'overdue';
+}
+
+export interface Expense {
+  id: string;
+  date: string;
+  type: string;
+  amount: number;
+  description: string;
+  createdAt: string;
 }
 
 // Helper function for API calls
@@ -257,6 +270,102 @@ export const transactionsStore = {
       method: 'DELETE',
     });
     return true;
+  },
+};
+
+// Expenses Store (با fallback به localStorage)
+export const expensesStore = {
+  getAll: async (): Promise<Expense[]> => {
+    try {
+      return await apiCall<Expense[]>('/api/expenses');
+    } catch (error) {
+      // Fallback to localStorage if backend doesn't have expenses endpoint yet
+      const data = localStorage.getItem('expenses');
+      return data ? JSON.parse(data) : [];
+    }
+  },
+
+  getById: async (id: string): Promise<Expense> => {
+    try {
+      return await apiCall<Expense>(`/api/expenses/${id}`);
+    } catch (error) {
+      const expenses = await expensesStore.getAll();
+      const expense = expenses.find(e => e.id === id);
+      if (!expense) throw new Error('Expense not found');
+      return expense;
+    }
+  },
+
+  add: async (expense: Omit<Expense, 'id' | 'createdAt'>): Promise<Expense> => {
+    try {
+      return await apiCall<Expense>('/api/expenses', {
+        method: 'POST',
+        body: JSON.stringify(expense),
+      });
+    } catch (error) {
+      // Fallback to localStorage
+      const expenses = await expensesStore.getAll();
+      const newExpense: Expense = {
+        ...expense,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+      };
+      expenses.push(newExpense);
+      localStorage.setItem('expenses', JSON.stringify(expenses));
+      return newExpense;
+    }
+  },
+
+  update: async (id: string, updates: Partial<Omit<Expense, 'id' | 'createdAt'>>): Promise<Expense> => {
+    try {
+      return await apiCall<Expense>(`/api/expenses/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    } catch (error) {
+      // Fallback to localStorage
+      const expenses = await expensesStore.getAll();
+      const index = expenses.findIndex(e => e.id === id);
+      if (index === -1) throw new Error('Expense not found');
+      expenses[index] = { ...expenses[index], ...updates };
+      localStorage.setItem('expenses', JSON.stringify(expenses));
+      return expenses[index];
+    }
+  },
+
+  delete: async (id: string): Promise<boolean> => {
+    try {
+      await apiCall(`/api/expenses/${id}`, {
+        method: 'DELETE',
+      });
+      return true;
+    } catch (error) {
+      // Fallback to localStorage
+      const expenses = await expensesStore.getAll();
+      const filtered = expenses.filter(e => e.id !== id);
+      localStorage.setItem('expenses', JSON.stringify(filtered));
+      return true;
+    }
+  },
+
+  getByDateRange: async (startDate: string, endDate: string): Promise<Expense[]> => {
+    const expenses = await expensesStore.getAll();
+    return expenses.filter(e => {
+      const expenseDate = new Date(e.date);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      return expenseDate >= start && expenseDate <= end;
+    });
+  },
+
+  getByType: async (type: string): Promise<Expense[]> => {
+    const expenses = await expensesStore.getAll();
+    return expenses.filter(e => e.type === type);
+  },
+
+  getTotalAmount: async (): Promise<number> => {
+    const expenses = await expensesStore.getAll();
+    return expenses.reduce((sum, e) => sum + e.amount, 0);
   },
 };
 

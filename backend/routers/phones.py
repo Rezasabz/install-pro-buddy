@@ -19,6 +19,12 @@ def get_phones():
 def create_phone(phone: PhoneCreate):
     with get_db() as conn:
         cursor = conn.cursor()
+        
+        # Check if IMEI already exists
+        cursor.execute("SELECT id FROM phones WHERE imei = ?", (phone.imei,))
+        if cursor.fetchone():
+            raise HTTPException(status_code=400, detail=f"گوشی با IMEI {phone.imei} قبلاً ثبت شده است")
+        
         phone_id = str(uuid.uuid4())
         purchase_date = datetime.now().isoformat()
         

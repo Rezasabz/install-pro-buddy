@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Layout from "@/components/Layout";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
+import { useDataContext } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -11,9 +13,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { partnersStore, Partner, transactionsStore } from "@/lib/storeProvider";
+import { partnersStore, Partner, transactionsStore, Transaction, salesStore, installmentsStore } from "@/lib/storeProvider";
 import { formatCurrency, toPersianDigits } from "@/lib/persian";
-import { calculateFinancials, PartnerFinancials } from "@/lib/profitCalculator";
+import { calculateFinancialsFromData, PartnerFinancials } from "@/lib/profitCalculator";
 import { Plus, Edit, Trash2, Users, TrendingUp, DollarSign, ArrowUp, ArrowDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -38,15 +40,20 @@ const Partners = () => {
     open: boolean;
     partnerId: string;
   }>({ open: false, partnerId: '' });
+  const [partnerTransactions, setPartnerTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const { toast } = useToast();
+  const { refreshDashboard } = useDataContext();
 
-  useEffect(() => {
-    loadPartners();
-  }, []);
-
-  const loadPartners = async () => {
+  const loadPartners = useCallback(async () => {
     try {
-      const data = await partnersStore.getAll();
+      const [data, sales, installments] = await Promise.all([
+        partnersStore.getAll(),
+        salesStore.getAll(),
+        installmentsStore.getAll(),
+      ]);
+      
       // محاسبه سهم هر شریک بر اساس سرمایه
       const totalCapital = data.reduce((sum, p) => sum + p.capital, 0);
       const partnersWithShare = data.map(p => ({
@@ -56,7 +63,7 @@ const Partners = () => {
       setPartners(partnersWithShare);
 
       // محاسبه وضعیت مالی هر شریک
-      const financials = calculateFinancials();
+      const financials = calculateFinancialsFromData(data, sales, installments);
       const financialMap = new Map<string, PartnerFinancials>();
       financials.partnerFinancials.forEach(p => {
         financialMap.set(p.partnerId, p);
@@ -70,7 +77,32 @@ const Partners = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadPartners();
+  }, [loadPartners]);
+
+  // Listen for refresh events from other pages
+  useEffect(() => {
+    const handleRefresh = () => {
+      loadPartners();
+    };
+
+    window.addEventListener('refreshPartners', handleRefresh);
+    return () => {
+      window.removeEventListener('refreshPartners', handleRefresh);
+    };
+  }, [loadPartners]);
+
+  // Load transactions when dialog opens
+  useEffect(() => {
+    if (transactionHistoryDialog.open && transactionHistoryDialog.partnerId) {
+      transactionsStore.getByPartnerId(transactionHistoryDialog.partnerId).then(txs => {
+        setPartnerTransactions(txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      });
+    }
+  }, [transactionHistoryDialog.open, transactionHistoryDialog.partnerId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +117,11 @@ const Partners = () => {
       return;
     }
 
+    // بستن dialog و نمایش loading
+    setIsDialogOpen(false);
+    setIsLoading(true);
+    setLoadingMessage(editingPartner ? "در حال بروزرسانی شریک..." : "در حال افزودن شریک...");
+    
     try {
       if (editingPartner) {
         await partnersStore.update(editingPartner.id, {
@@ -109,7 +146,6 @@ const Partners = () => {
 
       setFormData({ name: "", capital: "" });
       setEditingPartner(null);
-      setIsDialogOpen(false);
       loadPartners();
     } catch (error) {
       console.error('Error saving partner:', error);
@@ -118,6 +154,9 @@ const Partners = () => {
         description: "خطا در ذخیره شریک",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage("");
     }
   };
 
@@ -150,7 +189,7 @@ const Partners = () => {
     }
   };
 
-  const handleTransaction = (e: React.FormEvent) => {
+  const handleTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const amount = parseFloat(transactionAmount);
@@ -166,7 +205,7 @@ const Partners = () => {
     const partner = partners.find(p => p.id === transactionDialog.partnerId);
     if (!partner) return;
 
-    // بررسی موجودی برای برداشت
+    // بررسی موجودی برای برداشت (قبل از بستن dialog)
     if (transactionDialog.type === 'capital_withdraw' && amount > partner.availableCapital) {
       toast({
         title: "خطا",
@@ -213,36 +252,42 @@ const Partners = () => {
         return;
       }
     }
+    
+    // بستن dialog و نمایش loading
+    setTransactionDialog({ open: false, partnerId: '', type: 'capital_add' });
+    setIsLoading(true);
+    setLoadingMessage("در حال ثبت تراکنش...");
 
-    // ثبت تراکنش
-    transactionsStore.add({
-      partnerId: transactionDialog.partnerId,
-      type: transactionDialog.type,
-      amount,
-      description: transactionDescription || getTransactionLabel(transactionDialog.type),
-      profitType: transactionDialog.type === 'profit_to_capital' ? profitType : undefined,
-    });
+    try {
+      // ثبت تراکنش
+      await transactionsStore.add({
+        partnerId: transactionDialog.partnerId,
+        type: transactionDialog.type,
+        amount,
+        description: transactionDescription || getTransactionLabel(transactionDialog.type),
+        profitType: transactionDialog.type === 'profit_to_capital' ? profitType : undefined,
+      });
 
-    // بروزرسانی حساب شریک
-    if (transactionDialog.type === 'capital_add') {
-      partnersStore.update(transactionDialog.partnerId, {
-        capital: partner.capital + amount,
-        availableCapital: partner.availableCapital + amount,
-      });
-    } else if (transactionDialog.type === 'capital_withdraw') {
-      partnersStore.update(transactionDialog.partnerId, {
-        capital: partner.capital - amount,
-        availableCapital: partner.availableCapital - amount,
-      });
-    } else if (transactionDialog.type === 'initial_profit_withdraw') {
-      partnersStore.update(transactionDialog.partnerId, {
-        initialProfit: partner.initialProfit - amount,
-      });
-    } else if (transactionDialog.type === 'monthly_profit_withdraw') {
-      partnersStore.update(transactionDialog.partnerId, {
-        monthlyProfit: partner.monthlyProfit - amount,
-      });
-    } else if (transactionDialog.type === 'profit_to_capital') {
+      // بروزرسانی حساب شریک
+      if (transactionDialog.type === 'capital_add') {
+        await partnersStore.update(transactionDialog.partnerId, {
+          capital: partner.capital + amount,
+          availableCapital: partner.availableCapital + amount,
+        });
+      } else if (transactionDialog.type === 'capital_withdraw') {
+        await partnersStore.update(transactionDialog.partnerId, {
+          capital: partner.capital - amount,
+          availableCapital: partner.availableCapital - amount,
+        });
+      } else if (transactionDialog.type === 'initial_profit_withdraw') {
+        await partnersStore.update(transactionDialog.partnerId, {
+          initialProfit: partner.initialProfit - amount,
+        });
+      } else if (transactionDialog.type === 'monthly_profit_withdraw') {
+        await partnersStore.update(transactionDialog.partnerId, {
+          monthlyProfit: partner.monthlyProfit - amount,
+        });
+      } else if (transactionDialog.type === 'profit_to_capital') {
       // تبدیل سود به سرمایه
       let initialDeduction = 0;
       let monthlyDeduction = 0;
@@ -272,16 +317,28 @@ const Partners = () => {
       });
     }
 
-    toast({
-      title: "موفق",
-      description: `${getTransactionLabel(transactionDialog.type)} با موفقیت ثبت شد`,
-    });
+      toast({
+        title: "موفق",
+        description: `${getTransactionLabel(transactionDialog.type)} با موفقیت ثبت شد`,
+      });
 
-    setTransactionDialog({ open: false, partnerId: '', type: 'capital_add' });
-    setTransactionAmount("");
-    setTransactionDescription("");
-    setProfitType('both');
-    loadPartners();
+      setTransactionAmount("");
+      setTransactionDescription("");
+      setProfitType('both');
+      
+      await loadPartners();
+      refreshDashboard();
+    } catch (error) {
+      console.error('Error processing transaction:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در ثبت تراکنش",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage("");
+    }
   };
 
   const getTransactionLabel = (type: string) => {
@@ -295,10 +352,20 @@ const Partners = () => {
     }
   };
 
-  const financialSummary = calculateFinancials();
+  // محاسبه خلاصه مالی از state
+  const financialSummary = {
+    totalCapital: partners.reduce((sum, p) => sum + p.capital, 0),
+    totalAvailableCapital: partners.reduce((sum, p) => sum + p.availableCapital, 0),
+    totalUsedCapital: partners.reduce((sum, p) => sum + (p.capital - p.availableCapital), 0),
+    totalInitialProfit: partners.reduce((sum, p) => sum + (p.initialProfit || 0), 0),
+    totalMonthlyProfit: partners.reduce((sum, p) => sum + (p.monthlyProfit || 0), 0),
+    totalProfit: partners.reduce((sum, p) => sum + ((p.initialProfit || 0) + (p.monthlyProfit || 0)), 0),
+    partnerFinancials: [],
+  };
 
   return (
     <Layout>
+      {isLoading && <LoadingOverlay message={loadingMessage} />}
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -487,8 +554,7 @@ const Partners = () => {
                 const partner = partners.find(p => p.id === transactionHistoryDialog.partnerId);
                 if (!partner) return null;
 
-                const transactions = transactionsStore.getByPartnerId(partner.id)
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                const transactions = partnerTransactions;
 
                 return (
                   <div className="space-y-4">

@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Layout from "@/components/Layout";
+import { useDataContext } from "@/contexts/DataContext";
 import MetricCard from "@/components/MetricCard";
 import {
   DollarSign,
   ShoppingCart,
   Smartphone,
   TrendingUp,
+  TrendingDown,
   Users,
   Clock,
   Download,
@@ -21,12 +23,13 @@ import {
   installmentsStore,
   partnersStore,
   transactionsStore,
+  expensesStore,
   Partner,
   Transaction,
 } from "@/lib/storeProvider";
 import { formatCurrency, toPersianDigits } from "@/lib/persian";
 import { loadSampleData, clearAllData } from "@/lib/sampleData";
-import { calculateFinancials } from "@/lib/profitCalculator";
+import { calculateFinancialsFromData } from "@/lib/profitCalculator";
 import { useToast } from "@/hooks/use-toast";
 
 interface DashboardStats {
@@ -40,6 +43,8 @@ interface DashboardStats {
   initialProfit: number;
   monthlyProfit: number;
   totalProfit: number;
+  totalExpenses: number;
+  netProfit: number;
 }
 
 const Dashboard = () => {
@@ -51,6 +56,8 @@ const Dashboard = () => {
     totalCapital: 0,
     availableCapital: 0,
     usedCapital: 0,
+    totalExpenses: 0,
+    netProfit: 0,
     initialProfit: 0,
     monthlyProfit: 0,
     totalProfit: 0,
@@ -59,15 +66,17 @@ const Dashboard = () => {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { refreshDashboard } = useDataContext();
 
-  const fetchDashboardStats = async () => {
+  const fetchDashboardStats = useCallback(async () => {
     try {
-      const [sales, customers, installments, allTransactions, allPartners] = await Promise.all([
+      const [sales, customers, installments, allTransactions, allPartners, expenses] = await Promise.all([
         salesStore.getAll(),
         customersStore.getAll(),
         installmentsStore.getAll(),
         transactionsStore.getAll(),
         partnersStore.getAll(),
+        expensesStore.getAll(),
       ]);
 
       setTransactions(allTransactions);
@@ -80,7 +89,11 @@ const Dashboard = () => {
         .reduce((sum, inst) => sum + inst.totalAmount, 0);
 
       // محاسبه وضعیت مالی با استفاده از profitCalculator
-      const financials = calculateFinancials();
+      const financials = calculateFinancialsFromData(allPartners, sales, installments);
+
+      // محاسبه هزینه‌ها و سود خالص
+      const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+      const netProfit = financials.totalProfit - totalExpenses;
 
       setStats({
         totalRevenue,
@@ -93,6 +106,8 @@ const Dashboard = () => {
         initialProfit: financials.totalInitialProfit,
         monthlyProfit: financials.totalMonthlyProfit,
         totalProfit: financials.totalProfit,
+        totalExpenses,
+        netProfit,
       });
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
@@ -104,12 +119,24 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchDashboardStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Listen for refresh events from other pages
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchDashboardStats();
+    };
+
+    window.addEventListener('refreshDashboard', handleRefresh);
+    return () => {
+      window.removeEventListener('refreshDashboard', handleRefresh);
+    };
+  }, [fetchDashboardStats]);
 
   if (loading) {
     return (
@@ -205,12 +232,26 @@ const Dashboard = () => {
           />
         </div>
 
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
           <MetricCard
             title="سود کل"
             value={formatCurrency(stats.totalProfit)}
             icon={TrendingUp}
             description="مجموع سود"
+          />
+          <MetricCard
+            title="هزینه‌ها"
+            value={formatCurrency(stats.totalExpenses)}
+            icon={TrendingDown}
+            description="مجموع هزینه‌ها"
+            className="text-destructive"
+          />
+          <MetricCard
+            title="سود خالص"
+            value={formatCurrency(stats.netProfit)}
+            icon={DollarSign}
+            description="سود - هزینه"
+            className={stats.netProfit >= 0 ? "text-success" : "text-destructive"}
           />
           <MetricCard
             title="درآمد کل"
