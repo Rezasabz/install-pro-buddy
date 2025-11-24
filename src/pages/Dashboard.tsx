@@ -185,16 +185,27 @@ const Dashboard = () => {
               </Button>
             )}
             <Button
-              variant="outline"
+              variant="destructive"
               size="sm"
-              onClick={() => {
-                if (confirm("⚠️ هشدار: تمام داده‌ها پاک خواهند شد!\n\nاین عمل غیرقابل بازگشت است. آیا مطمئن هستید؟")) {
-                  clearAllData();
+              onClick={async () => {
+                if (confirm("⚠️ هشدار: تمام داده‌ها پاک خواهند شد!\n\nاین شامل:\n- شرکا و سرمایه‌ها\n- سرمایه‌گذاران\n- موجودی گوشی‌ها\n- فروش‌ها و اقساط\n- مشتریان\n- هزینه‌ها\n- تراکنش‌ها\n\nاین عمل غیرقابل بازگشت است. آیا مطمئن هستید؟")) {
+                  toast({
+                    title: "در حال پاک کردن...",
+                    description: "لطفاً صبر کنید",
+                  });
+                  const success = await clearAllData();
+                  if (!success) {
+                    toast({
+                      title: "خطا",
+                      description: "خطا در پاک کردن داده‌ها",
+                      variant: "destructive",
+                    });
+                  }
                 }
               }}
             >
               <Trash2 className="ml-2 h-4 w-4" />
-              پاک کردن همه
+              پاک کردن همه داده‌ها
             </Button>
           </div>
         </div>
