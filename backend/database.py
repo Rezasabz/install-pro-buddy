@@ -118,12 +118,42 @@ def init_db():
             )
         """)
         
+        # Investors table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS investors (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                phone TEXT NOT NULL,
+                national_id TEXT NOT NULL,
+                investment_amount REAL NOT NULL,
+                profit_rate REAL NOT NULL DEFAULT 4.0,
+                total_profit REAL NOT NULL DEFAULT 0,
+                start_date TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at TEXT NOT NULL
+            )
+        """)
+        
+        # Investor Transactions table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS investor_transactions (
+                id TEXT PRIMARY KEY,
+                investor_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                amount REAL NOT NULL,
+                description TEXT NOT NULL,
+                date TEXT NOT NULL,
+                FOREIGN KEY (investor_id) REFERENCES investors(id)
+            )
+        """)
+        
         # Create indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_sales_phone ON sales(phone_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_installments_sale ON installments(sale_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_installments_status ON installments(status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_partner ON transactions(partner_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_investor_transactions_investor ON investor_transactions(investor_id)")
         
         conn.commit()
         print("✅ Database initialized successfully")

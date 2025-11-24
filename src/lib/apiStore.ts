@@ -84,6 +84,28 @@ export interface Expense {
   createdAt: string;
 }
 
+export interface Investor {
+  id: string;
+  name: string;
+  phone: string;
+  nationalId: string;
+  investmentAmount: number;
+  profitRate: number;
+  totalProfit: number;
+  startDate: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+}
+
+export interface InvestorTransaction {
+  id: string;
+  investorId: string;
+  type: 'profit_payment' | 'investment_add' | 'investment_withdraw';
+  amount: number;
+  description: string;
+  date: string;
+}
+
 // Helper function for API calls
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -378,3 +400,45 @@ export async function checkApiHealth(): Promise<boolean> {
     return false;
   }
 }
+
+// Investors
+export const investorsStore = {
+  getAll: (): Promise<Investor[]> => apiCall('/api/investors/'),
+  
+  add: (investor: Omit<Investor, 'id' | 'createdAt' | 'totalProfit'>): Promise<Investor> =>
+    apiCall('/api/investors/', {
+      method: 'POST',
+      body: JSON.stringify(investor),
+    }),
+  
+  update: (id: string, updates: Partial<Investor>): Promise<Investor> =>
+    apiCall(`/api/investors/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    }),
+  
+  delete: (id: string): Promise<void> =>
+    apiCall(`/api/investors/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+// Investor Transactions
+export const investorTransactionsStore = {
+  getAll: (): Promise<InvestorTransaction[]> => apiCall('/api/investors/transactions/all'),
+  
+  getByInvestorId: (investorId: string): Promise<InvestorTransaction[]> =>
+    apiCall(`/api/investors/${investorId}/transactions`),
+  
+  add: (transaction: Omit<InvestorTransaction, 'id' | 'date'>): Promise<InvestorTransaction> =>
+    apiCall('/api/investors/transactions/', {
+      method: 'POST',
+      body: JSON.stringify(transaction),
+    }),
+  
+  delete: (id: string): Promise<void> => {
+    // Note: Backend doesn't have individual transaction delete yet
+    // This is a placeholder for future implementation
+    throw new Error('Delete investor transaction not implemented in backend');
+  },
+};

@@ -9,10 +9,13 @@ export type {
   Sale,
   Installment,
   Expense,
+  ProfitCalculationType,
+} from './apiStore';
+
+export type {
   Investor,
   InvestorTransaction,
-  ProfitCalculationType,
-} from './store';
+} from './apiStore';
 
 // Direct export of API stores - no localStorage fallback
 export const partnersStore = apiStore.partnersStore;
@@ -22,11 +25,8 @@ export const salesStore = apiStore.salesStore;
 export const installmentsStore = apiStore.installmentsStore;
 export const transactionsStore = apiStore.transactionsStore;
 export const expensesStore = apiStore.expensesStore;
-
-// Investors use localStorage (not in API yet)
-import * as localStore from './store';
-export const investorsStore = localStore.investorsStore;
-export const investorTransactionsStore = localStore.investorTransactionsStore;
+export const investorsStore = apiStore.investorsStore;
+export const investorTransactionsStore = apiStore.investorTransactionsStore;
 
 // Health check
 export const checkApiHealth = apiStore.checkApiHealth;
