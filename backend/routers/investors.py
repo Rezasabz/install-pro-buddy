@@ -3,8 +3,14 @@ from typing import List
 import uuid
 from datetime import datetime
 
-from ..database import get_db
-from ..models import Investor, InvestorCreate, InvestorUpdate, InvestorTransaction, InvestorTransactionCreate
+from database import get_db
+from models import (
+    Investor,
+    InvestorCreate,
+    InvestorUpdate,
+    InvestorTransaction,
+    InvestorTransactionCreate
+)
 
 router = APIRouter(prefix="/investors", tags=["investors"])
 
