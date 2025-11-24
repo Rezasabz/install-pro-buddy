@@ -1,52 +1,17 @@
 /**
- * سیستم احراز هویت
+ * سیستم احراز هویت - متصل به API
  */
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export interface User {
   id: string;
   fullName: string;
-  mobile: string; // نام کاربری (شماره موبایل)
-  password: string; // هش شده
+  mobile: string;
   createdAt: string;
 }
 
 const STORAGE_KEY = 'auth_user';
-const USERS_KEY = 'users';
-
-/**
- * هش ساده رمز عبور (در production باید از bcrypt استفاده شود)
- */
-function hashPassword(password: string): string {
-  // در production باید از bcrypt یا argon2 استفاده شود
-  // این فقط برای demo است
-  return btoa(password + 'salt_key_2024');
-}
-
-/**
- * بررسی رمز عبور
- */
-function verifyPassword(password: string, hashedPassword: string): boolean {
-  return hashPassword(password) === hashedPassword;
-}
-
-/**
- * دریافت تمام کاربران
- */
-function getAllUsers(): User[] {
-  try {
-    const data = localStorage.getItem(USERS_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
-}
-
-/**
- * ذخیره کاربران
- */
-function saveUsers(users: User[]): void {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
 
 /**
  * ثبت‌نام کاربر جدید
@@ -57,50 +22,39 @@ export async function register(
   password: string
 ): Promise<{ success: boolean; message: string; user?: User }> {
   try {
-    // اعتبارسنجی
-    if (!fullName || fullName.trim().length < 3) {
-      return { success: false, message: 'نام و نام خانوادگی باید حداقل ۳ کاراکتر باشد' };
+    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        fullName,
+        mobile,
+        password,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { 
+        success: false, 
+        message: error.detail || 'خطا در ثبت‌نام' 
+      };
     }
 
-    if (!mobile || !/^09\d{9}$/.test(mobile)) {
-      return { success: false, message: 'شماره موبایل نامعتبر است (مثال: ۰۹۱۲۳۴۵۶۷۸۹)' };
-    }
+    const user: User = await response.json();
 
-    if (!password || password.length < 6) {
-      return { success: false, message: 'رمز عبور باید حداقل ۶ کاراکتر باشد' };
-    }
-
-    const users = getAllUsers();
-
-    // بررسی تکراری بودن شماره موبایل
-    if (users.some(u => u.mobile === mobile)) {
-      return { success: false, message: 'این شماره موبایل قبلاً ثبت شده است' };
-    }
-
-    // ایجاد کاربر جدید
-    const newUser: User = {
-      id: Date.now().toString(),
-      fullName: fullName.trim(),
-      mobile,
-      password: hashPassword(password),
-      createdAt: new Date().toISOString(),
-    };
-
-    users.push(newUser);
-    saveUsers(users);
-
-    // لاگین خودکار
-    const userWithoutPassword = { ...newUser, password: '' };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(userWithoutPassword));
+    // ذخیره اطلاعات کاربر در localStorage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
 
     return { 
       success: true, 
       message: 'ثبت‌نام با موفقیت انجام شد', 
-      user: userWithoutPassword 
+      user 
     };
   } catch (error) {
     console.error('خطا در ثبت‌نام:', error);
-    return { success: false, message: 'خطا در ثبت‌نام. لطفاً دوباره تلاش کنید' };
+    return { success: false, message: 'خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید' };
   }
 }
 
@@ -112,34 +66,38 @@ export async function login(
   password: string
 ): Promise<{ success: boolean; message: string; user?: User }> {
   try {
-    // اعتبارسنجی
-    if (!mobile || !password) {
-      return { success: false, message: 'لطفاً شماره موبایل و رمز عبور را وارد کنید' };
+    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        mobile,
+        password,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { 
+        success: false, 
+        message: error.detail || 'خطا در ورود' 
+      };
     }
 
-    const users = getAllUsers();
-    const user = users.find(u => u.mobile === mobile);
+    const user: User = await response.json();
 
-    if (!user) {
-      return { success: false, message: 'شماره موبایل یا رمز عبور اشتباه است' };
-    }
-
-    if (!verifyPassword(password, user.password)) {
-      return { success: false, message: 'شماره موبایل یا رمز عبور اشتباه است' };
-    }
-
-    // ذخیره اطلاعات کاربر (بدون رمز عبور)
-    const userWithoutPassword = { ...user, password: '' };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(userWithoutPassword));
+    // ذخیره اطلاعات کاربر در localStorage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
 
     return { 
       success: true, 
       message: 'ورود با موفقیت انجام شد', 
-      user: userWithoutPassword 
+      user 
     };
   } catch (error) {
     console.error('خطا در ورود:', error);
-    return { success: false, message: 'خطا در ورود. لطفاً دوباره تلاش کنید' };
+    return { success: false, message: 'خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید' };
   }
 }
 

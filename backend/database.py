@@ -147,6 +147,17 @@ def init_db():
             )
         """)
         
+        # Users table for authentication
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                full_name TEXT NOT NULL,
+                mobile TEXT NOT NULL UNIQUE,
+                password TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        
         # Create indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_sales_phone ON sales(phone_id)")
@@ -154,6 +165,7 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_installments_status ON installments(status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_partner ON transactions(partner_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_investor_transactions_investor ON investor_transactions(investor_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_mobile ON users(mobile)")
         
         conn.commit()
         print("✅ Database initialized successfully")

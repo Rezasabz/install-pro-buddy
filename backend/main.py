@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 
 from database import init_db
-from routers import partners, phones, customers, sales, installments, transactions, investors
+from routers import partners, phones, customers, sales, installments, transactions, investors, auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,6 +38,7 @@ app.include_router(sales.router, prefix="/api/sales", tags=["Sales"])
 app.include_router(installments.router, prefix="/api/installments", tags=["Installments"])
 app.include_router(transactions.router, prefix="/api/transactions", tags=["Transactions"])
 app.include_router(investors.router, prefix="/api/investors", tags=["Investors"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 
 @app.get("/")
 def read_root():

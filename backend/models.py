@@ -219,3 +219,23 @@ class InvestorTransaction(InvestorTransactionBase):
     date: str
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+# User/Auth Models
+class UserBase(BaseModel):
+    full_name: str = Field(..., alias='fullName')
+    mobile: str
+
+    model_config = ConfigDict(populate_by_name=True)
+
+class UserCreate(UserBase):
+    password: str
+
+class UserLogin(BaseModel):
+    mobile: str
+    password: str
+
+class User(UserBase):
+    id: str
+    created_at: str = Field(..., alias='createdAt')
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
