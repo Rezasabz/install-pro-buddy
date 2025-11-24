@@ -156,6 +156,10 @@ const Installments = () => {
       // افزودن سود ماهانه به حساب شرکا
       await addMonthlyProfitToPartners(installment.interestAmount);
 
+      // پرداخت سود به سرمایه‌گذاران (۴٪ از سود ماهانه)
+      const { payInvestorsProfit } = await import('@/lib/profitCalculator');
+      await payInvestorsProfit(installment.interestAmount);
+
       // بررسی اینکه آیا همه اقساط پرداخت شده‌اند
       const saleInstallments = installments.filter(i => i.saleId === installment.saleId);
       const allPaid = saleInstallments.every(i => i.id === installmentId || i.status === 'paid');

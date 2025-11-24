@@ -16,6 +16,7 @@ import Sales from "./pages/Sales";
 import Customers from "./pages/Customers";
 import Installments from "./pages/Installments";
 import Expenses from "./pages/Expenses";
+import Investors from "./pages/Investors";
 import NotFound from "./pages/NotFound";
 import { needsMigration, migrateOldData } from "./lib/migration";
 import { fixPartnerData } from "./lib/fixData";
@@ -63,6 +64,7 @@ const App = () => {
                 <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
                 <Route path="/installments" element={<ProtectedRoute><Installments /></ProtectedRoute>} />
                 <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+                <Route path="/investors" element={<ProtectedRoute><Investors /></ProtectedRoute>} />
                 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

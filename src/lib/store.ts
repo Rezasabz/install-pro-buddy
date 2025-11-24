@@ -12,6 +12,28 @@ export interface Partner {
   createdAt: string;
 }
 
+export interface Investor {
+  id: string;
+  name: string;
+  phone: string;
+  nationalId: string;
+  investmentAmount: number; // مبلغ سرمایه‌گذاری
+  profitRate: number; // درصد سود (پیش‌فرض 4%)
+  totalProfit: number; // کل سود دریافتی
+  startDate: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+}
+
+export interface InvestorTransaction {
+  id: string;
+  investorId: string;
+  type: 'profit_payment' | 'investment_add' | 'investment_withdraw';
+  amount: number;
+  description: string;
+  date: string;
+}
+
 export interface Transaction {
   id: string;
   partnerId: string;
@@ -92,6 +114,8 @@ const STORAGE_KEYS = {
   INSTALLMENTS: 'installments',
   TRANSACTIONS: 'transactions',
   EXPENSES: 'expenses',
+  INVESTORS: 'investors',
+  INVESTOR_TRANSACTIONS: 'investor_transactions',
 };
 
 // Helper functions
@@ -375,5 +399,71 @@ export const expensesStore = {
   // مجموع هزینه‌ها
   getTotalAmount: (): number => {
     return expensesStore.getAll().reduce((sum, e) => sum + e.amount, 0);
+  },
+};
+
+// Investors
+export const investorsStore = {
+  getAll: (): Investor[] => getFromStorage<Investor>(STORAGE_KEYS.INVESTORS),
+  
+  add: (investor: Omit<Investor, 'id' | 'createdAt' | 'totalProfit'>): Investor => {
+    const investors = investorsStore.getAll();
+    const newInvestor: Investor = {
+      ...investor,
+      id: generateUUID(),
+      totalProfit: 0,
+      createdAt: new Date().toISOString(),
+    };
+    investors.push(newInvestor);
+    saveToStorage(STORAGE_KEYS.INVESTORS, investors);
+    return newInvestor;
+  },
+  
+  update: (id: string, updates: Partial<Investor>): Investor | null => {
+    const investors = investorsStore.getAll();
+    const index = investors.findIndex(i => i.id === id);
+    if (index === -1) return null;
+    
+    investors[index] = { ...investors[index], ...updates };
+    saveToStorage(STORAGE_KEYS.INVESTORS, investors);
+    return investors[index];
+  },
+  
+  delete: (id: string): boolean => {
+    const investors = investorsStore.getAll();
+    const filtered = investors.filter(i => i.id !== id);
+    if (filtered.length === investors.length) return false;
+    
+    saveToStorage(STORAGE_KEYS.INVESTORS, filtered);
+    return true;
+  },
+};
+
+// Investor Transactions
+export const investorTransactionsStore = {
+  getAll: (): InvestorTransaction[] => getFromStorage<InvestorTransaction>(STORAGE_KEYS.INVESTOR_TRANSACTIONS),
+  
+  getByInvestorId: (investorId: string): InvestorTransaction[] => {
+    return investorTransactionsStore.getAll().filter(t => t.investorId === investorId);
+  },
+  
+  add: (transaction: Omit<InvestorTransaction, 'id'>): InvestorTransaction => {
+    const transactions = investorTransactionsStore.getAll();
+    const newTransaction: InvestorTransaction = {
+      ...transaction,
+      id: generateUUID(),
+    };
+    transactions.push(newTransaction);
+    saveToStorage(STORAGE_KEYS.INVESTOR_TRANSACTIONS, transactions);
+    return newTransaction;
+  },
+  
+  delete: (id: string): boolean => {
+    const transactions = investorTransactionsStore.getAll();
+    const filtered = transactions.filter(t => t.id !== id);
+    if (filtered.length === transactions.length) return false;
+    
+    saveToStorage(STORAGE_KEYS.INVESTOR_TRANSACTIONS, filtered);
+    return true;
   },
 };

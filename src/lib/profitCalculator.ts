@@ -278,3 +278,32 @@ export async function addMonthlyProfitToPartners(profitAmount: number): Promise<
     });
   }
 }
+
+/**
+ * پرداخت سود به سرمایه‌گذاران (۴٪ از سود ماهانه)
+ */
+export async function payInvestorsProfit(monthlyProfit: number): Promise<void> {
+  const { investorsStore, investorTransactionsStore } = await import('./storeProvider');
+  
+  const investors = await investorsStore.getAll();
+  const activeInvestors = investors.filter(i => i.status === 'active');
+  
+  for (const investor of activeInvestors) {
+    // محاسبه سود سرمایه‌گذار (درصد سود × سود ماهانه)
+    const investorProfit = (investor.profitRate / 100) * monthlyProfit;
+    
+    // ثبت تراکنش
+    await investorTransactionsStore.add({
+      investorId: investor.id,
+      type: 'profit_payment',
+      amount: investorProfit,
+      description: `پرداخت ${investor.profitRate}٪ سود از سود ماهانه ${monthlyProfit.toLocaleString('fa-IR')} تومان`,
+      date: new Date().toISOString(),
+    });
+    
+    // آپدیت کل سود دریافتی
+    await investorsStore.update(investor.id, {
+      totalProfit: investor.totalProfit + investorProfit,
+    });
+  }
+}

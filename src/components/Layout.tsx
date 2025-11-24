@@ -34,6 +34,7 @@ const Layout = ({ children }: LayoutProps) => {
   const navigation = [
     { name: "داشبورد", href: "/", icon: LayoutDashboard },
     { name: "شرکا", href: "/partners", icon: Users },
+    { name: "سرمایه‌گذاران", href: "/investors", icon: DollarSign },
     { name: "موجودی", href: "/inventory", icon: Smartphone },
     { name: "فروش", href: "/sales", icon: ShoppingCart },
     { name: "مشتریان", href: "/customers", icon: Users },
