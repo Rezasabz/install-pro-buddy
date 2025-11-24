@@ -26,6 +26,7 @@ import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
 import { Plus, Edit, Trash2, Receipt, TrendingDown, Calendar, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { JalaliDatePicker } from "@/components/JalaliDatePicker";
+import { cn } from "@/lib/utils";
 
 // انواع هزینه‌های پیش‌فرض
 const EXPENSE_TYPES = [
@@ -99,10 +100,24 @@ export default function Expenses() {
     setFilteredExpenses(filtered);
   }, [expenses, typeFilter, searchQuery]);
 
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numericValue = value.replace(/[^\d]/g, '');
+    
+    if (numericValue === '') {
+      setFormData({ ...formData, amount: '' });
+      return;
+    }
+    
+    const number = parseInt(numericValue, 10);
+    const formatted = number.toLocaleString('en-US');
+    setFormData({ ...formData, amount: formatted });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const amount = parseFloat(formData.amount);
+    const amount = parseFloat(formData.amount.replace(/,/g, ''));
     if (isNaN(amount) || amount <= 0) {
       toast({
         title: "خطا",
@@ -173,7 +188,7 @@ export default function Expenses() {
     setEditingExpense(expense);
     setFormData({
       type: expense.type,
-      amount: expense.amount.toString(),
+      amount: expense.amount.toLocaleString('en-US'),
       description: expense.description,
     });
     setExpenseDate(new Date(expense.date));
@@ -208,11 +223,13 @@ export default function Expenses() {
   return (
     <Layout>
       {isLoading && <LoadingOverlay message={loadingMessage} />}
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">مدیریت هزینه‌ها</h1>
-            <p className="text-muted-foreground">
+      <div className="space-y-6 animate-fade-scale">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-2">
+          <div className="space-y-1">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
+              مدیریت هزینه‌ها
+            </h1>
+            <p className="text-muted-foreground/80 text-sm md:text-base">
               ثبت و مدیریت هزینه‌های کسب‌وکار
             </p>
           </div>
@@ -224,8 +241,9 @@ export default function Expenses() {
                   setExpenseDate(new Date());
                   setEditingExpense(null);
                 }}
+                className="gap-2 hover:scale-105 transition-all duration-200"
               >
-                <Plus className="ml-2 h-4 w-4" />
+                <Plus className="h-4 w-4" />
                 ثبت هزینه جدید
               </Button>
             </DialogTrigger>
@@ -269,12 +287,11 @@ export default function Expenses() {
                   <Label htmlFor="amount">مبلغ (تومان)</Label>
                   <Input
                     id="amount"
-                    type="number"
+                    type="text"
                     value={formData.amount}
-                    onChange={(e) =>
-                      setFormData({ ...formData, amount: e.target.value })
-                    }
-                    placeholder="مثال: ۱۰۰۰۰۰۰"
+                    onChange={handleAmountChange}
+                    placeholder="مثال: ۱,۰۰۰,۰۰۰"
+                    dir="ltr"
                   />
                 </div>
 
@@ -300,45 +317,67 @@ export default function Expenses() {
         </div>
 
         {/* کارت آمار */}
-        <Card>
-          <CardHeader>
+        <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+          <div className="absolute inset-0 bg-gradient-to-br from-destructive/5 via-transparent to-destructive/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardHeader className="relative z-10">
             <CardTitle className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5" />
+              <div className="relative">
+                <div className="absolute inset-0 bg-destructive/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                <TrendingDown className="relative h-5 w-5 text-destructive" />
+              </div>
               مجموع هزینه‌ها
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-destructive">
+          <CardContent className="relative z-10">
+            <div className="text-3xl font-bold bg-gradient-to-r from-destructive to-destructive/80 bg-clip-text text-transparent">
               {formatCurrency(totalExpenses)}
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground/70 mt-2">
               {toPersianDigits(filteredExpenses.length)} هزینه ثبت شده
             </p>
           </CardContent>
         </Card>
 
         {/* فیلترها */}
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-lg transition-shadow duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
+          <CardHeader className="relative z-10 pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-primary to-secondary" />
+              فیلترها و جستجو
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="relative z-10">
             <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="search">جستجو</Label>
+              <div className="space-y-2">
+                <Label htmlFor="search" className="flex items-center gap-2 text-sm font-semibold">
+                  <div className="p-1.5 rounded-md bg-primary/10">
+                    <Filter className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  جستجو
+                </Label>
                 <Input
                   id="search"
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="جستجو در توضیحات..."
+                  placeholder="جستجو در توضیحات و نوع..."
+                  className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
                 />
               </div>
-              <div>
-                <Label htmlFor="typeFilter">فیلتر بر اساس نوع</Label>
+              <div className="space-y-2">
+                <Label htmlFor="typeFilter" className="flex items-center gap-2 text-sm font-semibold">
+                  <div className="p-1.5 rounded-md bg-secondary/10">
+                    <Receipt className="h-3.5 w-3.5 text-secondary" />
+                  </div>
+                  فیلتر بر اساس نوع
+                </Label>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger>
-                    <SelectValue />
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="همه انواع" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">همه</SelectItem>
+                    <SelectItem value="all">همه انواع</SelectItem>
                     {EXPENSE_TYPES.map((type) => (
                       <SelectItem key={type} value={type}>
                         {type}
@@ -348,39 +387,85 @@ export default function Expenses() {
                 </Select>
               </div>
             </div>
+            {(searchQuery || typeFilter !== "all") && (
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setTypeFilter("all");
+                  }}
+                  className="gap-2 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50 hover:scale-105 transition-all duration-200"
+                >
+                  <Filter className="h-4 w-4 rotate-180" />
+                  پاک کردن فیلترها
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* لیست هزینه‌ها */}
         <div className="space-y-4">
           {filteredExpenses.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                هیچ هزینه‌ای ثبت نشده است
+            <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm">
+              <div className="absolute inset-0 bg-gradient-to-br from-destructive/5 via-transparent to-destructive/5" />
+              <CardContent className="py-12 text-center relative z-10">
+                <div className="relative inline-block mb-4">
+                  <div className="absolute inset-0 bg-destructive/20 rounded-full blur-lg" />
+                  <Receipt className="relative h-12 w-12 text-destructive mx-auto" />
+                </div>
+                <p className="text-muted-foreground/70 text-base">
+                  {searchQuery || typeFilter !== "all" 
+                    ? "هیچ هزینه‌ای با این فیلتر یافت نشد"
+                    : "هیچ هزینه‌ای ثبت نشده است"}
+                </p>
+                {searchQuery || typeFilter !== "all" ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setTypeFilter("all");
+                    }}
+                    className="mt-4 gap-2 hover:scale-105 transition-all duration-200"
+                  >
+                    <Filter className="h-4 w-4 rotate-180" />
+                    پاک کردن فیلترها
+                  </Button>
+                ) : null}
               </CardContent>
             </Card>
           ) : (
-            filteredExpenses.map((expense) => (
-              <Card key={expense.id} className="hover:shadow-lg transition-shadow">
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
+            filteredExpenses.map((expense, index) => (
+              <Card 
+                key={expense.id} 
+                className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.01] transition-all duration-300 group animate-slide-in"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-destructive/5 via-transparent to-destructive/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <CardContent className="pt-6 relative z-10">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
-                        <Receipt className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-semibold">{expense.type}</span>
+                        <div className="p-1.5 rounded-md bg-destructive/10">
+                          <Receipt className="h-4 w-4 text-destructive" />
+                        </div>
+                        <span className="font-bold text-base">{expense.type}</span>
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2">
+                      <p className="text-sm text-muted-foreground/70 mb-3 leading-relaxed">
                         {expense.description}
                       </p>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {toJalaliDate(expense.date)}
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground/70">
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/30">
+                          <Calendar className="h-3.5 w-3.5" />
+                          <span className="font-medium">{toJalaliDate(expense.date)}</span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="text-xl font-bold text-destructive">
+                    <div className="flex flex-col items-end gap-3 min-w-[140px]">
+                      <div className="text-2xl font-bold bg-gradient-to-r from-destructive to-destructive/80 bg-clip-text text-transparent">
                         {formatCurrency(expense.amount)}
                       </div>
                       <div className="flex gap-2">
@@ -388,6 +473,7 @@ export default function Expenses() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleEdit(expense)}
+                          className="hover:bg-primary/10 hover:border-primary/50 hover:scale-110 transition-all duration-200"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -395,8 +481,9 @@ export default function Expenses() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleDelete(expense.id)}
+                          className="hover:bg-destructive/10 hover:border-destructive/50 hover:scale-110 transition-all duration-200"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
                     </div>

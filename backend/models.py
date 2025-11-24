@@ -239,3 +239,29 @@ class User(UserBase):
     created_at: str = Field(..., alias='createdAt')
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+# Expense Models
+class ExpenseBase(BaseModel):
+    date: str
+    type: str
+    amount: float
+    description: str
+
+    model_config = ConfigDict(populate_by_name=True)
+
+class ExpenseCreate(ExpenseBase):
+    pass
+
+class ExpenseUpdate(BaseModel):
+    date: Optional[str] = None
+    type: Optional[str] = None
+    amount: Optional[float] = None
+    description: Optional[str] = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+class Expense(ExpenseBase):
+    id: str
+    created_at: str = Field(..., alias='createdAt')
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)

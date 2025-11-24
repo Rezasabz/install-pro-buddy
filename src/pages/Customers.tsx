@@ -27,6 +27,7 @@ import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
 import { Plus, Edit, Trash2, Users, Phone, IdCard, Search, FileText, AlertCircle, CheckCircle, DollarSign, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PDFButton } from "@/components/PDFButton";
+import { cn } from "@/lib/utils";
 
 const Customers = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -242,21 +243,26 @@ const Customers = () => {
   return (
     <Layout>
       {isLoading && <LoadingOverlay message={loadingMessage} />}
-      <div className="space-y-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold">مدیریت مشتریان</h1>
-            <p className="text-muted-foreground">
+      <div className="space-y-6 animate-fade-scale">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-2">
+          <div className="space-y-1">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
+              مدیریت مشتریان
+            </h1>
+            <p className="text-muted-foreground/80 text-sm md:text-base">
               مدیریت اطلاعات مشتریان و خریداران
             </p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => {
-                setEditingCustomer(null);
-                setFormData({ name: "", phone: "", nationalId: "", address: "" });
-              }}>
-                <Plus className="ml-2 h-4 w-4" />
+              <Button 
+                onClick={() => {
+                  setEditingCustomer(null);
+                  setFormData({ name: "", phone: "", nationalId: "", address: "" });
+                }}
+                className="gap-2 hover:scale-105 transition-all duration-200"
+              >
+                <Plus className="h-4 w-4" />
                 افزودن مشتری
               </Button>
             </DialogTrigger>
@@ -325,34 +331,44 @@ const Customers = () => {
           </Dialog>
         </div>
 
-        <Card>
-          <CardHeader>
+        <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardHeader className="relative z-10">
             <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Users className="relative h-5 w-5 text-primary" />
+              </div>
               تعداد مشتریان
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">
+          <CardContent className="relative z-10">
+            <div className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
               {toPersianDigits(customers.length)}
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground/70 mt-2">
               مشتری ثبت شده
             </p>
           </CardContent>
         </Card>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {customers.map((customer) => (
-            <Card key={customer.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
+          {customers.map((customer, index) => (
+            <Card 
+              key={customer.id} 
+              className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group animate-slide-in"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <CardHeader className="relative z-10">
                 <CardTitle className="flex justify-between items-start">
-                  <span className="text-lg">{customer.name}</span>
+                  <span className="text-lg font-bold">{customer.name}</span>
                   <div className="flex gap-2">
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handleEdit(customer)}
+                      className="hover:bg-primary/10 hover:scale-110 transition-all duration-200"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -360,30 +376,31 @@ const Customers = () => {
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDelete(customer.id)}
+                      className="hover:bg-destructive/10 hover:scale-110 transition-all duration-200"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span dir="ltr">{customer.phone}</span>
+              <CardContent className="space-y-3 relative z-10">
+                <div className="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-accent/30 transition-colors duration-200">
+                  <Phone className="h-4 w-4 text-muted-foreground/70" />
+                  <span dir="ltr" className="font-medium">{customer.phone}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <IdCard className="h-4 w-4 text-muted-foreground" />
-                  <span>{customer.nationalId}</span>
+                <div className="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-accent/30 transition-colors duration-200">
+                  <IdCard className="h-4 w-4 text-muted-foreground/70" />
+                  <span className="font-medium">{customer.nationalId}</span>
                 </div>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-sm text-muted-foreground/70 p-2 rounded-lg bg-muted/30">
                   {customer.address}
                 </div>
-                <div className="pt-2 border-t">
-                  <div className="text-xs text-muted-foreground">
-                    تعداد خرید: {toPersianDigits(getCustomerSalesCount(customer.id))}
+                <div className="pt-2 border-t border-border/50">
+                  <div className="text-xs text-muted-foreground/70 mb-1">
+                    تعداد خرید: <span className="font-semibold text-foreground">{toPersianDigits(getCustomerSalesCount(customer.id))}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    تاریخ ثبت: {toJalaliDate(customer.createdAt)}
+                  <div className="text-xs text-muted-foreground/70">
+                    تاریخ ثبت: <span className="font-semibold text-foreground">{toJalaliDate(customer.createdAt)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -392,10 +409,14 @@ const Customers = () => {
         </div>
 
         {customers.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Users className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground text-center">
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
+            <CardContent className="flex flex-col items-center justify-center py-12 relative z-10">
+              <div className="relative mb-4">
+                <div className="absolute inset-0 bg-primary/20 rounded-full blur-lg" />
+                <Users className="relative h-12 w-12 text-primary" />
+              </div>
+              <p className="text-muted-foreground/70 text-center leading-relaxed">
                 هنوز مشتری‌ای ثبت نشده است
                 <br />
                 برای شروع، یک مشتری اضافه کنید

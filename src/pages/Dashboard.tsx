@@ -31,6 +31,7 @@ import { formatCurrency, toPersianDigits } from "@/lib/persian";
 import { loadSampleData, clearAllData } from "@/lib/sampleData";
 import { calculateFinancialsFromData } from "@/lib/profitCalculator";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface DashboardStats {
   totalRevenue: number;
@@ -150,15 +151,18 @@ const Dashboard = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold">داشبورد</h1>
-            <p className="text-muted-foreground">
+      <div className="space-y-6 animate-fade-scale">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-2">
+          <div className="space-y-1">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
+              داشبورد
+            </h1>
+            <p className="text-muted-foreground/80 text-sm md:text-base">
               نمای کلی از کسب و کار فروش موبایل شما
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {stats.totalSales === 0 && (
               <Button
                 variant="outline"
@@ -179,8 +183,9 @@ const Dashboard = () => {
                     });
                   }
                 }}
+                className="gap-2 hover:bg-primary/10 hover:border-primary/50 hover:scale-105 transition-all duration-200"
               >
-                <Download className="ml-2 h-4 w-4" />
+                <Download className="h-4 w-4" />
                 بارگذاری داده نمونه
               </Button>
             )}
@@ -203,8 +208,9 @@ const Dashboard = () => {
                   }
                 }
               }}
+              className="gap-2 hover:scale-105 transition-all duration-200"
             >
-              <Trash2 className="ml-2 h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
               پاک کردن همه داده‌ها
             </Button>
           </div>
@@ -284,35 +290,45 @@ const Dashboard = () => {
           />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>اقساط در انتظار دریافت</CardTitle>
+        <Card className="relative overflow-hidden bg-gradient-to-br from-warning/10 via-warning/5 to-transparent border-warning/20 hover:shadow-xl transition-all duration-300 group">
+          <div className="absolute inset-0 bg-gradient-to-br from-warning/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardHeader className="relative z-10">
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-warning" />
+              اقساط در انتظار دریافت
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-warning">
+          <CardContent className="relative z-10">
+            <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-warning to-warning/80 bg-clip-text text-transparent">
               {formatCurrency(stats.pendingInstallments)}
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground/80 mt-2 leading-relaxed">
               مبلغی که باید از مشتریان دریافت شود (اصل + سود ۴٪)
             </p>
           </CardContent>
         </Card>
 
         {stats.totalSales === 0 && (
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <div className="text-primary">
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+          <Card className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10 border-primary/30 hover:shadow-xl transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardContent className="pt-6 relative z-10">
+              <div className="flex items-start gap-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-secondary/30 rounded-full blur-lg" />
+                  <div className="relative text-primary">
+                    <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold mb-1">راهنمای شروع</h3>
-                  <p className="text-sm text-muted-foreground mb-3">
+                <div className="flex-1 space-y-2">
+                  <h3 className="font-bold text-lg bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                    راهنمای شروع
+                  </h3>
+                  <p className="text-sm text-muted-foreground/80 leading-relaxed">
                     برای شروع، روی دکمه "بارگذاری داده نمونه" کلیک کنید تا با سیستم آشنا شوید.
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground/70 bg-muted/50 p-2 rounded-lg border border-border/50">
                     💡 اگر خطایی مشاهده کردید، روی "پاک کردن همه" کلیک کنید و دوباره داده نمونه را بارگذاری کنید.
                   </p>
                 </div>
@@ -322,46 +338,60 @@ const Dashboard = () => {
         )}
 
         <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>دسترسی سریع</CardTitle>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
+              <CardTitle className="flex items-center gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-primary to-secondary" />
+                دسترسی سریع
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-2 relative z-10">
               <a
                 href="/sales"
-                className="block p-4 border rounded-lg hover:bg-accent transition-colors"
+                className="block p-4 border border-border/50 rounded-xl hover:bg-gradient-to-r hover:from-primary/10 hover:to-secondary/10 hover:border-primary/50 transition-all duration-200 hover:scale-[1.02] group/link"
               >
-                <div className="font-medium">ثبت فروش جدید</div>
-                <div className="text-sm text-muted-foreground">
+                <div className="font-semibold group-hover/link:text-primary transition-colors duration-200">
+                  ثبت فروش جدید
+                </div>
+                <div className="text-sm text-muted-foreground/70 mt-1">
                   ایجاد فروش اقساطی جدید
                 </div>
               </a>
               <a
                 href="/installments"
-                className="block p-4 border rounded-lg hover:bg-accent transition-colors"
+                className="block p-4 border border-border/50 rounded-xl hover:bg-gradient-to-r hover:from-primary/10 hover:to-secondary/10 hover:border-primary/50 transition-all duration-200 hover:scale-[1.02] group/link"
               >
-                <div className="font-medium">مدیریت اقساط</div>
-                <div className="text-sm text-muted-foreground">
+                <div className="font-semibold group-hover/link:text-primary transition-colors duration-200">
+                  مدیریت اقساط
+                </div>
+                <div className="text-sm text-muted-foreground/70 mt-1">
                   پیگیری و بروزرسانی وضعیت پرداخت
                 </div>
               </a>
               <a
                 href="/partners"
-                className="block p-4 border rounded-lg hover:bg-accent transition-colors"
+                className="block p-4 border border-border/50 rounded-xl hover:bg-gradient-to-r hover:from-primary/10 hover:to-secondary/10 hover:border-primary/50 transition-all duration-200 hover:scale-[1.02] group/link"
               >
-                <div className="font-medium">مدیریت سرمایه</div>
-                <div className="text-sm text-muted-foreground">
+                <div className="font-semibold group-hover/link:text-primary transition-colors duration-200">
+                  مدیریت سرمایه
+                </div>
+                <div className="text-sm text-muted-foreground/70 mt-1">
                   افزایش یا برداشت سرمایه و سود
                 </div>
               </a>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>آخرین تراکنش‌های مالی</CardTitle>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
+              <CardTitle className="flex items-center gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-primary to-secondary" />
+                آخرین تراکنش‌های مالی
+              </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="relative z-10">
               {(() => {
                 const allTransactions = transactions
                   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -369,7 +399,7 @@ const Dashboard = () => {
 
                 if (allTransactions.length === 0) {
                   return (
-                    <div className="text-center py-4 text-muted-foreground text-sm">
+                    <div className="text-center py-8 text-muted-foreground/70 text-sm">
                       هنوز تراکنشی ثبت نشده است
                     </div>
                   );
@@ -377,20 +407,28 @@ const Dashboard = () => {
 
                 return (
                   <div className="space-y-2">
-                    {allTransactions.map((transaction) => {
+                    {allTransactions.map((transaction, index) => {
                       const partner = partners.find(p => p.id === transaction.partnerId);
                       const isWithdraw = transaction.type.includes('withdraw');
                       
                       return (
-                        <div key={transaction.id} className="flex justify-between items-center p-2 border-b last:border-0">
+                        <div
+                          key={transaction.id}
+                          className="flex justify-between items-center p-3 border border-border/50 rounded-lg hover:bg-accent/50 hover:border-primary/30 transition-all duration-200 hover:scale-[1.01] animate-slide-in"
+                          style={{ animationDelay: `${index * 50}ms` }}
+                        >
                           <div className="flex-1">
-                            <div className="text-sm font-medium">{partner?.name}</div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-sm font-semibold">{partner?.name || 'نامشخص'}</div>
+                            <div className="text-xs text-muted-foreground/70 mt-0.5">
                               {transaction.description}
                             </div>
                           </div>
-                          <div className={`text-sm font-semibold ${isWithdraw ? 'text-destructive' : 'text-success'}`}>
-                            {isWithdraw ? '-' : '+'}{formatCurrency(transaction.amount)}
+                          <div className={`text-sm font-bold px-2 py-1 rounded-md ${
+                            isWithdraw 
+                              ? 'text-destructive bg-destructive/10' 
+                              : 'text-success bg-success/10'
+                          }`}>
+                            {isWithdraw ? '−' : '+'}{formatCurrency(transaction.amount)}
                           </div>
                         </div>
                       );
@@ -401,47 +439,51 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>تحلیل کسب و کار</CardTitle>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
+              <CardTitle className="flex items-center gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-primary to-secondary" />
+                تحلیل کسب و کار
+              </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="relative z-10">
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">
+                <div className="flex justify-between items-center p-2 rounded-lg hover:bg-accent/30 transition-colors duration-200">
+                  <span className="text-sm text-muted-foreground/80 font-medium">
                     میانگین ارزش فروش
                   </span>
-                  <span className="font-medium">
+                  <span className="font-bold text-foreground">
                     {formatCurrency(stats.totalSales > 0
                       ? Math.round(stats.totalRevenue / stats.totalSales)
                       : 0)}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">
+                <div className="flex justify-between items-center p-2 rounded-lg hover:bg-success/10 transition-colors duration-200">
+                  <span className="text-sm text-muted-foreground/80 font-medium">
                     نسبت سود اولیه
                   </span>
-                  <span className="font-medium text-success">
+                  <span className="font-bold text-success px-2 py-1 bg-success/10 rounded-md">
                     {toPersianDigits(stats.totalProfit > 0
                       ? Math.round((stats.initialProfit / stats.totalProfit) * 100)
                       : 0)}%
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">
+                <div className="flex justify-between items-center p-2 rounded-lg hover:bg-secondary/10 transition-colors duration-200">
+                  <span className="text-sm text-muted-foreground/80 font-medium">
                     نسبت سود ماهانه
                   </span>
-                  <span className="font-medium text-secondary">
+                  <span className="font-bold text-secondary px-2 py-1 bg-secondary/10 rounded-md">
                     {toPersianDigits(stats.totalProfit > 0
                       ? Math.round((stats.monthlyProfit / stats.totalProfit) * 100)
                       : 0)}%
                   </span>
                 </div>
-                <div className="flex justify-between items-center pt-2 border-t">
-                  <span className="text-sm text-muted-foreground">
+                <div className="flex justify-between items-center pt-3 border-t border-border/50 p-2 rounded-lg hover:bg-accent/30 transition-colors duration-200">
+                  <span className="text-sm text-muted-foreground/80 font-medium">
                     نسبت سرمایه در دسترس
                   </span>
-                  <span className="font-medium">
+                  <span className="font-bold text-foreground px-2 py-1 bg-primary/10 rounded-md">
                     {toPersianDigits(stats.totalCapital > 0
                       ? Math.round((stats.availableCapital / stats.totalCapital) * 100)
                       : 0)}%

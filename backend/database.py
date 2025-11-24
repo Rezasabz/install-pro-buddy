@@ -158,6 +158,18 @@ def init_db():
             )
         """)
         
+        # Expenses table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS expenses (
+                id TEXT PRIMARY KEY,
+                date TEXT NOT NULL,
+                type TEXT NOT NULL,
+                amount REAL NOT NULL,
+                description TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        
         # Create indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_sales_phone ON sales(phone_id)")
@@ -166,6 +178,8 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_partner ON transactions(partner_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_investor_transactions_investor ON investor_transactions(investor_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_mobile ON users(mobile)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_expenses_type ON expenses(type)")
         
         conn.commit()
         print("✅ Database initialized successfully")

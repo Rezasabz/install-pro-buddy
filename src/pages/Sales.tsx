@@ -45,6 +45,7 @@ import {
 } from "@/lib/profitCalculator";
 import { Plus, ShoppingCart, TrendingUp, Trash2, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const Sales = () => {
   const [sales, setSales] = useState<Sale[]>([]);
@@ -136,9 +137,9 @@ const Sales = () => {
       const phone = availablePhones.find(p => p.id === formData.phoneId);
       if (!phone) return;
 
-      const announcedPrice = parseFloat(formData.announcedPrice) || 0;
+      const announcedPrice = parseFloat(formData.announcedPrice.replace(/,/g, '')) || 0;
       const purchasePrice = phone.purchasePrice;
-      const downPayment = parseFloat(formData.downPayment) || 0;
+      const downPayment = parseFloat(formData.downPayment.replace(/,/g, '')) || 0;
       const installmentMonths = parseInt(formData.installmentMonths);
 
       if (announcedPrice > 0 && downPayment < announcedPrice && installmentMonths >= 2) {
@@ -205,6 +206,34 @@ const Sales = () => {
     }
   };
 
+  const handleAnnouncedPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numericValue = value.replace(/[^\d]/g, '');
+    
+    if (numericValue === '') {
+      setFormData({ ...formData, announcedPrice: '' });
+      return;
+    }
+    
+    const number = parseInt(numericValue, 10);
+    const formatted = number.toLocaleString('en-US');
+    setFormData({ ...formData, announcedPrice: formatted });
+  };
+
+  const handleDownPaymentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numericValue = value.replace(/[^\d]/g, '');
+    
+    if (numericValue === '') {
+      setFormData({ ...formData, downPayment: '' });
+      return;
+    }
+    
+    const number = parseInt(numericValue, 10);
+    const formatted = number.toLocaleString('en-US');
+    setFormData({ ...formData, downPayment: formatted });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -218,9 +247,9 @@ const Sales = () => {
       return;
     }
 
-    const announcedPrice = parseFloat(formData.announcedPrice);
+    const announcedPrice = parseFloat(formData.announcedPrice.replace(/,/g, ''));
     const purchasePrice = phone.purchasePrice;
-    const downPayment = parseFloat(formData.downPayment);
+    const downPayment = parseFloat(formData.downPayment.replace(/,/g, ''));
     const installmentMonths = parseInt(formData.installmentMonths);
 
     // اعتبارسنجی
@@ -416,11 +445,13 @@ const Sales = () => {
   return (
     <Layout>
       {isLoading && <LoadingOverlay message={loadingMessage} />}
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">مدیریت فروش</h1>
-            <p className="text-muted-foreground">
+      <div className="space-y-6 animate-fade-scale">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-2">
+          <div className="space-y-1">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
+              مدیریت فروش
+            </h1>
+            <p className="text-muted-foreground/80 text-sm md:text-base">
               ثبت و مدیریت فروش‌های اقساطی
             </p>
           </div>
@@ -439,8 +470,9 @@ const Sales = () => {
                   });
                 }}
                 disabled={customers.length === 0 || availablePhones.length === 0}
+                className="gap-2 hover:scale-105 transition-all duration-200"
               >
-                <Plus className="ml-2 h-4 w-4" />
+                <Plus className="h-4 w-4" />
                 ثبت فروش جدید
               </Button>
             </DialogTrigger>
@@ -503,13 +535,12 @@ const Sales = () => {
                   <Label htmlFor="announcedPrice">قیمت اعلامی به مشتری (تومان)</Label>
                   <Input
                     id="announcedPrice"
-                    type="number"
+                    type="text"
                     value={formData.announcedPrice}
-                    onChange={(e) =>
-                      setFormData({ ...formData, announcedPrice: e.target.value })
-                    }
+                    onChange={handleAnnouncedPriceChange}
                     required
-                    placeholder="مثال: ۲۲۰۰۰۰۰۰"
+                    placeholder="مثال: ۲۲,۰۰۰,۰۰۰"
+                    dir="ltr"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     قیمتی که به مشتری اعلام می‌کنید (پیش‌فرض: قیمت فروش گوشی)
@@ -519,13 +550,12 @@ const Sales = () => {
                   <Label htmlFor="downPayment">پیش‌پرداخت (تومان)</Label>
                   <Input
                     id="downPayment"
-                    type="number"
+                    type="text"
                     value={formData.downPayment}
-                    onChange={(e) =>
-                      setFormData({ ...formData, downPayment: e.target.value })
-                    }
+                    onChange={handleDownPaymentChange}
                     required
-                    placeholder="مثال: ۵۰۰۰۰۰۰"
+                    placeholder="مثال: ۵,۰۰۰,۰۰۰"
+                    dir="ltr"
                   />
                 </div>
                 <div>
@@ -667,35 +697,43 @@ const Sales = () => {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
               <CardTitle className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5" />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ShoppingCart className="relative h-5 w-5 text-primary" />
+                </div>
                 فروش فعال
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
+            <CardContent className="relative z-10">
+              <div className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                 {toPersianDigits(activeSales)}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground/70 mt-2">
                 قرارداد در حال اجرا
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-success/5 via-transparent to-success/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-success/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <TrendingUp className="relative h-5 w-5 text-success" />
+                </div>
                 درآمد کل
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold bg-gradient-to-r from-success to-success/80 bg-clip-text text-transparent">
                 {formatCurrency(totalRevenue)}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground/70 mt-2">
                 مجموع فروش
               </p>
             </CardContent>
@@ -706,22 +744,30 @@ const Sales = () => {
           {sales.map((sale) => {
             const details = getSaleDetails(sale);
             return (
-              <Card key={sale.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
+              <Card key={sale.id} className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.01] transition-all duration-300 group">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <CardHeader className="relative z-10">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <CardTitle className="text-lg">
+                      <CardTitle className="text-lg font-bold">
                         {details.customer?.name || "نامشخص"}
                       </CardTitle>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground/70 mt-1">
                         {details.phone ? `${details.phone.brand} ${details.phone.model}` : 'گوشی نامشخص'}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground/60 mt-0.5">
                         قیمت اعلامی: {formatCurrency(sale.announcedPrice)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant={sale.status === 'active' ? 'default' : 'secondary'}>
+                      <Badge 
+                        variant={sale.status === 'active' ? 'default' : 'secondary'}
+                        className={cn(
+                          sale.status === 'active' && "bg-success/10 text-success border-success/20",
+                          sale.status === 'completed' && "bg-primary/10 text-primary border-primary/20",
+                          sale.status === 'defaulted' && "bg-destructive/10 text-destructive border-destructive/20"
+                        )}
+                      >
                         {sale.status === 'active' ? 'فعال' : 
                          sale.status === 'completed' ? 'تکمیل شده' : 'معوق'}
                       </Badge>
@@ -729,36 +775,36 @@ const Sales = () => {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDeleteSale(sale.id)}
-                        className="text-destructive hover:text-destructive"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 hover:scale-110 transition-all duration-200"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <div className="text-sm text-muted-foreground">سود اولیه</div>
-                      <div className="font-semibold text-success">{formatCurrency(sale.initialProfit)}</div>
+                <CardContent className="relative z-10">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-2 rounded-lg hover:bg-success/10 transition-colors duration-200">
+                      <div className="text-xs text-muted-foreground/70 mb-1">سود اولیه</div>
+                      <div className="font-bold text-success">{formatCurrency(sale.initialProfit)}</div>
                     </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">پیش‌پرداخت</div>
-                      <div className="font-semibold">{formatCurrency(sale.downPayment)}</div>
+                    <div className="p-2 rounded-lg hover:bg-accent/30 transition-colors duration-200">
+                      <div className="text-xs text-muted-foreground/70 mb-1">پیش‌پرداخت</div>
+                      <div className="font-bold text-foreground">{formatCurrency(sale.downPayment)}</div>
                     </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">سود ۴٪ دریافتی</div>
-                      <div className="font-semibold text-secondary">{formatCurrency(details.paidInterest)}</div>
+                    <div className="p-2 rounded-lg hover:bg-secondary/10 transition-colors duration-200">
+                      <div className="text-xs text-muted-foreground/70 mb-1">سود ۴٪ دریافتی</div>
+                      <div className="font-bold text-secondary">{formatCurrency(details.paidInterest)}</div>
                     </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">مانده بدهی</div>
-                      <div className="font-semibold text-warning">
+                    <div className="p-2 rounded-lg hover:bg-warning/10 transition-colors duration-200">
+                      <div className="text-xs text-muted-foreground/70 mb-1">مانده بدهی</div>
+                      <div className="font-bold text-warning">
                         {formatCurrency(details.remainingDebt)}
                       </div>
                     </div>
                   </div>
-                  <div className="mt-4 pt-4 border-t flex justify-between items-center">
-                    <div className="text-sm text-muted-foreground">
+                  <div className="mt-4 pt-4 border-t border-border/50 flex justify-between items-center">
+                    <div className="text-sm text-muted-foreground/70">
                       پرداخت شده: {toPersianDigits(details.paidCount)} از {toPersianDigits(details.totalCount)} قسط
                     </div>
                     <div className="flex items-center gap-2">
@@ -774,11 +820,12 @@ const Sales = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => setDetailsDialog({ open: true, saleId: sale.id })}
+                        className="gap-2 hover:bg-primary/10 hover:border-primary/50 hover:scale-105 transition-all duration-200"
                       >
-                        <Eye className="h-3 w-3 ml-1" />
+                        <Eye className="h-3 w-3" />
                         جزئیات
                       </Button>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground/60">
                         {toJalaliDate(sale.saleDate)}
                       </div>
                     </div>
@@ -790,10 +837,14 @@ const Sales = () => {
         </div>
 
         {sales.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <ShoppingCart className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground text-center">
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
+            <CardContent className="flex flex-col items-center justify-center py-12 relative z-10">
+              <div className="relative mb-4">
+                <div className="absolute inset-0 bg-primary/20 rounded-full blur-lg" />
+                <ShoppingCart className="relative h-12 w-12 text-primary" />
+              </div>
+              <p className="text-muted-foreground/70 text-center leading-relaxed">
                 هنوز فروشی ثبت نشده است
                 <br />
                 {customers.length === 0 && "ابتدا مشتری ثبت کنید"}
@@ -850,26 +901,37 @@ const Sales = () => {
                   <div className="pt-4 border-t">
                     <h3 className="font-semibold mb-3">جدول اقساط</h3>
                     <div className="space-y-2">
-                      {saleInstallments.map((inst) => (
-                        <div key={inst.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      {saleInstallments.map((inst, index) => (
+                        <div 
+                          key={inst.id} 
+                          className="flex items-center justify-between p-3 border border-border/50 rounded-lg hover:bg-accent/30 hover:border-primary/30 transition-all duration-200 hover:scale-[1.01] animate-slide-in"
+                          style={{ animationDelay: `${index * 30}ms` }}
+                        >
                           <div className="flex-1">
-                            <div className="font-medium">قسط {toPersianDigits(inst.installmentNumber)}</div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="font-semibold">قسط {toPersianDigits(inst.installmentNumber)}</div>
+                            <div className="text-xs text-muted-foreground/70 mt-0.5">
                               سررسید: {toJalaliDate(inst.dueDate)}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-sm">
+                          <div className="text-right space-y-1">
+                            <div className="text-sm font-medium">
                               اصل: {formatCurrency(inst.principalAmount)}
                             </div>
-                            <div className="text-sm text-secondary">
+                            <div className="text-sm text-secondary font-medium">
                               سود: {formatCurrency(inst.interestAmount)}
                             </div>
-                            <div className="font-semibold">
+                            <div className="font-bold text-primary">
                               مجموع: {formatCurrency(inst.totalAmount)}
                             </div>
                           </div>
-                          <Badge variant={inst.status === 'paid' ? 'default' : inst.status === 'overdue' ? 'destructive' : 'secondary'}>
+                          <Badge 
+                            variant={inst.status === 'paid' ? 'default' : inst.status === 'overdue' ? 'destructive' : 'secondary'}
+                            className={cn(
+                              inst.status === 'paid' && "bg-success/10 text-success border-success/20",
+                              inst.status === 'overdue' && "bg-destructive/10 text-destructive border-destructive/20",
+                              inst.status === 'pending' && "bg-warning/10 text-warning border-warning/20"
+                            )}
+                          >
                             {inst.status === 'paid' ? 'پرداخت شده' : inst.status === 'overdue' ? 'معوق' : 'در انتظار'}
                           </Badge>
                         </div>

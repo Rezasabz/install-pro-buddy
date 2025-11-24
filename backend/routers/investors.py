@@ -12,7 +12,7 @@ from models import (
     InvestorTransactionCreate
 )
 
-router = APIRouter(prefix="/investors", tags=["investors"])
+router = APIRouter()
 
 @router.get("/", response_model=List[Investor])
 def get_investors():

@@ -18,6 +18,7 @@ import { formatCurrency, toPersianDigits } from "@/lib/persian";
 import { calculateFinancialsFromData, PartnerFinancials } from "@/lib/profitCalculator";
 import { Plus, Edit, Trash2, Users, TrendingUp, DollarSign, ArrowUp, ArrowDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const Partners = () => {
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -104,10 +105,38 @@ const Partners = () => {
     }
   }, [transactionHistoryDialog.open, transactionHistoryDialog.partnerId]);
 
+  const handleCapitalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numericValue = value.replace(/[^\d]/g, '');
+    
+    if (numericValue === '') {
+      setFormData({ ...formData, capital: '' });
+      return;
+    }
+    
+    const number = parseInt(numericValue, 10);
+    const formatted = number.toLocaleString('en-US');
+    setFormData({ ...formData, capital: formatted });
+  };
+
+  const handleTransactionAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numericValue = value.replace(/[^\d]/g, '');
+    
+    if (numericValue === '') {
+      setTransactionAmount('');
+      return;
+    }
+    
+    const number = parseInt(numericValue, 10);
+    const formatted = number.toLocaleString('en-US');
+    setTransactionAmount(formatted);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const capital = parseFloat(formData.capital);
+    const capital = parseFloat(formData.capital.replace(/,/g, ''));
     if (isNaN(capital) || capital <= 0) {
       toast({
         title: "خطا",
@@ -164,7 +193,7 @@ const Partners = () => {
     setEditingPartner(partner);
     setFormData({
       name: partner.name,
-      capital: partner.capital.toString(),
+      capital: partner.capital.toLocaleString('en-US'),
     });
     setIsDialogOpen(true);
   };
@@ -192,7 +221,7 @@ const Partners = () => {
   const handleTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const amount = parseFloat(transactionAmount);
+    const amount = parseFloat(transactionAmount.replace(/,/g, ''));
     if (isNaN(amount) || amount <= 0) {
       toast({
         title: "خطا",
@@ -366,21 +395,26 @@ const Partners = () => {
   return (
     <Layout>
       {isLoading && <LoadingOverlay message={loadingMessage} />}
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">مدیریت شرکا</h1>
-            <p className="text-muted-foreground">
+      <div className="space-y-6 animate-fade-scale">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-2">
+          <div className="space-y-1">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
+              مدیریت شرکا
+            </h1>
+            <p className="text-muted-foreground/80 text-sm md:text-base">
               مدیریت سرمایه‌گذاری، سهم و سود شرکا
             </p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => {
-                setEditingPartner(null);
-                setFormData({ name: "", capital: "" });
-              }}>
-                <Plus className="ml-2 h-4 w-4" />
+              <Button 
+                onClick={() => {
+                  setEditingPartner(null);
+                  setFormData({ name: "", capital: "" });
+                }}
+                className="gap-2 hover:scale-105 transition-all duration-200"
+              >
+                <Plus className="h-4 w-4" />
                 افزودن شریک
               </Button>
             </DialogTrigger>
@@ -407,13 +441,12 @@ const Partners = () => {
                   <Label htmlFor="capital">مبلغ سرمایه (تومان)</Label>
                   <Input
                     id="capital"
-                    type="number"
+                    type="text"
                     value={formData.capital}
-                    onChange={(e) =>
-                      setFormData({ ...formData, capital: e.target.value })
-                    }
+                    onChange={handleCapitalChange}
                     required
-                    placeholder="10000000"
+                    placeholder="مثال: ۱۰,۰۰۰,۰۰۰"
+                    dir="ltr"
                   />
                 </div>
                 <Button type="submit" className="w-full">
@@ -484,12 +517,13 @@ const Partners = () => {
                   <div className="flex gap-2">
                     <Input
                       id="amount"
-                      type="number"
+                      type="text"
                       value={transactionAmount}
-                      onChange={(e) => setTransactionAmount(e.target.value)}
+                      onChange={handleTransactionAmountChange}
                       required
-                      placeholder="مبلغ را وارد کنید"
+                      placeholder="مثال: ۱۰,۰۰۰,۰۰۰"
                       className="flex-1"
+                      dir="ltr"
                     />
                     {(() => {
                       const partner = partners.find(p => p.id === transactionDialog.partnerId);
@@ -517,7 +551,7 @@ const Partners = () => {
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={() => setTransactionAmount(maxAmount.toString())}
+                            onClick={() => setTransactionAmount(maxAmount.toLocaleString('en-US'))}
                             className="text-xs whitespace-nowrap"
                           >
                             همه ({formatCurrency(maxAmount)})
@@ -621,86 +655,106 @@ const Partners = () => {
         </div>
 
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          <Card>
-            <CardHeader>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
               <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-5 w-5" />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <Users className="relative h-5 w-5 text-primary" />
+                </div>
                 سرمایه کل
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                 {formatCurrency(financialSummary.totalCapital)}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground/70 mt-2">
                 {toPersianDigits(partners.length)} شریک
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-success/5 via-transparent to-success/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
               <CardTitle className="flex items-center gap-2 text-base">
-                <DollarSign className="h-5 w-5 text-success" />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-success/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <DollarSign className="relative h-5 w-5 text-success" />
+                </div>
                 در دسترس
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-success">
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold bg-gradient-to-r from-success to-success/80 bg-clip-text text-transparent">
                 {formatCurrency(financialSummary.totalAvailableCapital)}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground/70 mt-2">
                 قابل استفاده برای خرید
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-warning/5 via-transparent to-warning/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
               <CardTitle className="flex items-center gap-2 text-base">
-                <DollarSign className="h-5 w-5 text-warning" />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-warning/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <DollarSign className="relative h-5 w-5 text-warning" />
+                </div>
                 در گردش
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-warning">
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold bg-gradient-to-r from-warning to-warning/80 bg-clip-text text-transparent">
                 {formatCurrency(financialSummary.totalUsedCapital)}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground/70 mt-2">
                 سرمایه استفاده شده
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
               <CardTitle className="flex items-center gap-2 text-base">
-                <TrendingUp className="h-5 w-5 text-secondary" />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-secondary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <TrendingUp className="relative h-5 w-5 text-secondary" />
+                </div>
                 سود ماهانه
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-secondary">
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold bg-gradient-to-r from-secondary to-secondary/80 bg-clip-text text-transparent">
                 {formatCurrency(financialSummary.totalMonthlyProfit)}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground/70 mt-2">
                 سود ۴٪ دریافت شده
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
               <CardTitle className="flex items-center gap-2 text-base">
-                <TrendingUp className="h-5 w-5" />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <TrendingUp className="relative h-5 w-5 text-primary" />
+                </div>
                 سود کل
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                 {formatCurrency(financialSummary.totalProfit)}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground/70 mt-2">
                 مجموع سود
               </p>
             </CardContent>
@@ -711,12 +765,14 @@ const Partners = () => {
           {partners.map((partner) => {
             const financial = partnerFinancials.get(partner.id);
             return (
-              <Card key={partner.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
+              <Card key={partner.id} className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <CardHeader className="relative z-10">
                   <CardTitle className="flex justify-between items-start">
-                    <span>{partner.name}</span>
+                    <span className="font-bold">{partner.name}</span>
                     <div className="flex gap-2">
                       <Button
+                        className="hover:scale-110 transition-transform duration-200"
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEdit(partner)}
@@ -733,7 +789,7 @@ const Partners = () => {
                     </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-3 relative z-10">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <div className="text-sm text-muted-foreground">سرمایه اولیه</div>
