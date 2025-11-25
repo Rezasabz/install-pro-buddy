@@ -21,19 +21,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
+# CORS middleware - Allow all origins (for development/demo)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8080",
-        "http://localhost:5173",
-        "http://185.92.182.51",
-        "http://185.92.182.51:8080",
-        "http://185.92.182.51:5173",
-        "http://soul.cleft.sbs",
-        "*"  # Allow all origins in development
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=False,  # Must be False when allow_origins is "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )
