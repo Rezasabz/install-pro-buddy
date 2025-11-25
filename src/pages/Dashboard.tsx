@@ -13,21 +13,40 @@ import {
   Download,
   Trash2,
   Percent,
+  Zap,
+  Activity,
+  AlertCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   salesStore,
-  phonesStore,
   customersStore,
   installmentsStore,
   partnersStore,
   transactionsStore,
   expensesStore,
+  phonesStore,
   Partner,
   Transaction,
+  Sale,
+  Phone,
+  Expense,
 } from "@/lib/storeProvider";
-import { formatCurrency, toPersianDigits } from "@/lib/persian";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
+import { Line, LineChart, Pie, PieChart, Cell, Bar, BarChart, XAxis, YAxis, CartesianGrid, Area, AreaChart } from "recharts";
+import { formatCurrency, toPersianDigits, toJalaliDate } from "@/lib/persian";
+import { dateToJalali, jalaliMonthNames } from "@/lib/jalali";
 import { loadSampleData, clearAllData } from "@/lib/sampleData";
 import { calculateFinancialsFromData } from "@/lib/profitCalculator";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +68,7 @@ interface DashboardStats {
 }
 
 const Dashboard = () => {
+  const [clearDataDialog, setClearDataDialog] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0,
     totalSales: 0,
@@ -65,40 +85,44 @@ const Dashboard = () => {
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [phones, setPhones] = useState<Phone[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { refreshDashboard } = useDataContext();
 
   const fetchDashboardStats = useCallback(async () => {
     try {
-      const [sales, customers, installments, allTransactions, allPartners, expenses] = await Promise.all([
+      const [allSales, customers, allInstallments, allTransactions, allPartners, allExpenses, allPhones] = await Promise.all([
         salesStore.getAll(),
         customersStore.getAll(),
         installmentsStore.getAll(),
         transactionsStore.getAll(),
         partnersStore.getAll(),
         expensesStore.getAll(),
+        phonesStore.getAll(),
       ]);
 
       setTransactions(allTransactions);
       setPartners(allPartners);
+      setSales(allSales);
+      setExpenses(allExpenses);
+      setPhones(allPhones);
 
-      const totalRevenue = sales.reduce((sum, sale) => sum + sale.announcedPrice, 0);
+      const totalRevenue = allSales.reduce((sum, sale) => sum + sale.announcedPrice, 0);
       
-      const pendingInstallments = installments
+      const pendingInstallments = allInstallments
         .filter(i => i.status === 'pending' || i.status === 'overdue')
         .reduce((sum, inst) => sum + inst.totalAmount, 0);
 
-      // محاسبه وضعیت مالی با استفاده از profitCalculator
-      const financials = calculateFinancialsFromData(allPartners, sales, installments);
-
-      // محاسبه هزینه‌ها و سود خالص
-      const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+      const financials = calculateFinancialsFromData(allPartners, allSales, allInstallments);
+      const totalExpenses = allExpenses.reduce((sum, e) => sum + e.amount, 0);
       const netProfit = financials.totalProfit - totalExpenses;
 
       setStats({
         totalRevenue,
-        totalSales: sales.length,
+        totalSales: allSales.length,
         activeCustomers: customers.length,
         pendingInstallments,
         totalCapital: financials.totalCapital,
@@ -124,15 +148,12 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchDashboardStats]);
 
-  // Listen for refresh events from other pages
   useEffect(() => {
     const handleRefresh = () => {
       fetchDashboardStats();
     };
-
     window.addEventListener('refreshDashboard', handleRefresh);
     return () => {
       window.removeEventListener('refreshDashboard', handleRefresh);
@@ -142,27 +163,118 @@ const Dashboard = () => {
   if (loading) {
     return (
       <Layout>
-      <div className="flex items-center justify-center h-64">
-        <div className="text-muted-foreground">در حال بارگذاری داشبورد...</div>
-      </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-muted-foreground">در حال بارگذاری داشبورد...</div>
+        </div>
       </Layout>
     );
   }
 
+
+  const recentTransactions = transactions
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
+
+  // آماده‌سازی داده‌های نمودارها
+  // 1. نمودار خطی - Total Revenue (ماهانه)
+  const monthlyRevenue = sales.reduce((acc, sale) => {
+    const date = new Date(sale.saleDate);
+    const jalali = dateToJalali(date);
+    const month = jalaliMonthNames[jalali.month - 1];
+    if (!acc[month]) {
+      acc[month] = 0;
+    }
+    acc[month] += sale.announcedPrice;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const revenueChartData = jalaliMonthNames.map(month => ({
+    month,
+    revenue: monthlyRevenue[month] || 0,
+  }));
+
+  // 2. نمودار دایره‌ای - Sales by Category (بر اساس برند)
+  const salesByBrand = sales.reduce((acc, sale) => {
+    const phone = phones.find(p => p.id === sale.phoneId);
+    const brand = phone?.brand || 'نامشخص';
+    if (!acc[brand]) {
+      acc[brand] = { name: brand, value: 0, count: 0 };
+    }
+    acc[brand].value += sale.announcedPrice;
+    acc[brand].count += 1;
+    return acc;
+  }, {} as Record<string, { name: string; value: number; count: number }>);
+
+  const pieChartData = Object.values(salesByBrand)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5)
+    .map((item, index) => ({
+      name: item.name,
+      value: item.value,
+      count: item.count,
+      color: [
+        'hsl(var(--primary))',
+        'hsl(var(--secondary))',
+        'hsl(var(--success))',
+        'hsl(var(--warning))',
+        'hsl(var(--destructive))',
+      ][index] || 'hsl(var(--muted-foreground))',
+    }));
+
+  // 3. نمودار برترین محصولات بر اساس تعداد فروش
+  const topProductsBySales = phones
+    .filter(p => p.status === 'sold')
+    .reduce((acc, phone) => {
+      const key = `${phone.brand} ${phone.model}`;
+      if (!acc[key]) {
+        acc[key] = { name: key, sales: 0, revenue: 0 };
+      }
+      acc[key].sales += 1;
+      acc[key].revenue += phone.sellingPrice;
+      return acc;
+    }, {} as Record<string, { name: string; sales: number; revenue: number }>);
+
+  const topProductsData = Object.values(topProductsBySales)
+    .sort((a, b) => b.sales - a.sales)
+    .slice(0, 5)
+    .map((item, index) => ({
+      name: `#${index + 1}`,
+      fullName: item.name,
+      sales: item.sales,
+      revenue: item.revenue,
+    }));
+
+  // 4. نمودار میله‌ای عمودی - Monthly Sales (تعداد فروش ماهانه)
+  const monthlySalesCount = sales.reduce((acc, sale) => {
+    const date = new Date(sale.saleDate);
+    const jalali = dateToJalali(date);
+    const month = jalaliMonthNames[jalali.month - 1];
+    if (!acc[month]) {
+      acc[month] = 0;
+    }
+    acc[month] += 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const monthlySalesData = jalaliMonthNames.map(month => ({
+    month,
+    sales: monthlySalesCount[month] || 0,
+  }));
+
   return (
     <Layout>
-      <div className="space-y-6 animate-fade-scale">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-2">
-          <div className="space-y-1">
-            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
+      <div className="space-y-6 pb-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="space-y-1.5">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
               داشبورد
             </h1>
-            <p className="text-muted-foreground/80 text-sm md:text-base">
+            <p className="text-sm text-muted-foreground">
               نمای کلی از کسب و کار فروش موبایل شما
             </p>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap sm:flex-nowrap">
             {stats.totalSales === 0 && (
               <Button
                 variant="outline"
@@ -175,7 +287,7 @@ const Dashboard = () => {
                       description: "داده‌های نمونه بارگذاری شد",
                     });
                     fetchDashboardStats();
-                    window.location.reload(); // رفرش برای نمایش صحیح
+                    window.location.reload();
                   } else {
                     toast({
                       title: "اطلاع",
@@ -183,7 +295,7 @@ const Dashboard = () => {
                     });
                   }
                 }}
-                className="gap-2 hover:bg-primary/10 hover:border-primary/50 hover:scale-105 transition-all duration-200"
+                className="gap-2"
               >
                 <Download className="h-4 w-4" />
                 بارگذاری داده نمونه
@@ -192,23 +304,8 @@ const Dashboard = () => {
             <Button
               variant="destructive"
               size="sm"
-              onClick={async () => {
-                if (confirm("⚠️ هشدار: تمام داده‌ها پاک خواهند شد!\n\nاین شامل:\n- شرکا و سرمایه‌ها\n- سرمایه‌گذاران\n- موجودی گوشی‌ها\n- فروش‌ها و اقساط\n- مشتریان\n- هزینه‌ها\n- تراکنش‌ها\n\nاین عمل غیرقابل بازگشت است. آیا مطمئن هستید؟")) {
-                  toast({
-                    title: "در حال پاک کردن...",
-                    description: "لطفاً صبر کنید",
-                  });
-                  const success = await clearAllData();
-                  if (!success) {
-                    toast({
-                      title: "خطا",
-                      description: "خطا در پاک کردن داده‌ها",
-                      variant: "destructive",
-                    });
-                  }
-                }
-              }}
-              className="gap-2 hover:scale-105 transition-all duration-200"
+              onClick={() => setClearDataDialog(true)}
+              className="gap-2"
             >
               <Trash2 className="h-4 w-4" />
               پاک کردن همه داده‌ها
@@ -216,7 +313,8 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        {/* کارت‌های آماری اصلی */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard
             title="سرمایه کل"
             value={formatCurrency(stats.totalCapital)}
@@ -230,38 +328,10 @@ const Dashboard = () => {
             description="قابل استفاده برای خرید"
           />
           <MetricCard
-            title="سرمایه در گردش"
-            value={formatCurrency(stats.usedCapital)}
-            icon={DollarSign}
-            description="استفاده شده"
-          />
-          <MetricCard
-            title="سود اولیه"
-            value={formatCurrency(stats.initialProfit)}
-            icon={TrendingUp}
-            description="تفاوت قیمت"
-          />
-          <MetricCard
-            title="سود ماهانه (۴٪)"
-            value={formatCurrency(stats.monthlyProfit)}
-            icon={Percent}
-            description="دریافت شده"
-          />
-        </div>
-
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
-          <MetricCard
             title="سود کل"
             value={formatCurrency(stats.totalProfit)}
             icon={TrendingUp}
             description="مجموع سود"
-          />
-          <MetricCard
-            title="هزینه‌ها"
-            value={formatCurrency(stats.totalExpenses)}
-            icon={TrendingDown}
-            description="مجموع هزینه‌ها"
-            className="text-destructive"
           />
           <MetricCard
             title="سود خالص"
@@ -270,229 +340,460 @@ const Dashboard = () => {
             description="سود - هزینه"
             className={stats.netProfit >= 0 ? "text-success" : "text-destructive"}
           />
-          <MetricCard
-            title="درآمد کل"
-            value={formatCurrency(stats.totalRevenue)}
-            icon={ShoppingCart}
-            description="قیمت اعلامی فروش‌ها"
-          />
-          <MetricCard
-            title="تعداد فروش"
-            value={toPersianDigits(stats.totalSales)}
-            icon={ShoppingCart}
-            description="تراکنش‌های انجام شده"
-          />
-          <MetricCard
-            title="مشتریان"
-            value={toPersianDigits(stats.activeCustomers)}
-            icon={Users}
-            description="مجموع مشتریان"
-          />
         </div>
 
-        <Card className="relative overflow-hidden bg-gradient-to-br from-warning/10 via-warning/5 to-transparent border-warning/20 hover:shadow-xl transition-all duration-300 group">
-          <div className="absolute inset-0 bg-gradient-to-br from-warning/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          <CardHeader className="relative z-10">
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-warning" />
+        {/* کارت اقساط در انتظار */}
+        <Card className="border-warning/20 bg-warning/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Clock className="h-4 w-4 text-warning" />
               اقساط در انتظار دریافت
             </CardTitle>
           </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-warning to-warning/80 bg-clip-text text-transparent">
+          <CardContent>
+            <div className="text-2xl sm:text-3xl font-bold text-warning mb-1.5">
               {formatCurrency(stats.pendingInstallments)}
             </div>
-            <p className="text-sm text-muted-foreground/80 mt-2 leading-relaxed">
+            <p className="text-sm text-muted-foreground">
               مبلغی که باید از مشتریان دریافت شود (اصل + سود ۴٪)
             </p>
           </CardContent>
         </Card>
 
-        {stats.totalSales === 0 && (
-          <Card className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10 border-primary/30 hover:shadow-xl transition-all duration-300 group">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <CardContent className="pt-6 relative z-10">
-              <div className="flex items-start gap-4">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-secondary/30 rounded-full blur-lg" />
-                  <div className="relative text-primary">
-                    <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+        {/* بخش نمودارها */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <h2 className="text-lg font-semibold">
+              نمودارها و تحلیل‌ها
+            </h2>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* نمودار خطی - Total Revenue */}
+            <Card className="flex flex-col">
+              <CardHeader className="pb-3 flex-shrink-0">
+                <CardTitle className="text-base font-semibold">درآمد کل</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 min-h-0">
+                <ChartContainer 
+                  config={{ 
+                    revenue: { 
+                      label: "درآمد", 
+                      color: "hsl(var(--chart-1))" 
+                    } 
+                  }} 
+                  className="h-full w-full [&>div]:!aspect-auto [&>div]:!h-full"
+                >
+                  <AreaChart data={revenueChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="fillRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="var(--color-revenue)" stopOpacity={0.1} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis 
+                      dataKey="month" 
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tick={{ fontSize: 12 }}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis 
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                      domain={[(dataMin: number) => Math.max(0, dataMin), (dataMax: number) => Math.ceil(dataMax * 1.1)]}
+                    />
+                    <ChartTooltip 
+                      cursor={false}
+                      content={<ChartTooltipContent indicator="dot" />}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="revenue" 
+                      fill="url(#fillRevenue)"
+                      fillOpacity={0.4}
+                      stroke="var(--color-revenue)"
+                      strokeWidth={2}
+                      isAnimationActive={true}
+                      baseValue={0}
+                    />
+                  </AreaChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* نمودار دایره‌ای - Sales by Category */}
+            <Card className="flex flex-col">
+              <CardHeader className="pb-3 flex-shrink-0">
+                <CardTitle className="text-base font-semibold">فروش بر اساس برند</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 min-h-0">
+                {pieChartData.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-muted-foreground/70 text-sm">
+                    داده‌ای برای نمایش وجود ندارد
                   </div>
+                ) : (
+                  <ChartContainer 
+                    config={pieChartData.reduce((acc, item, index) => {
+                      acc[`value${index}`] = {
+                        label: item.name,
+                        color: item.color,
+                      };
+                      return acc;
+                    }, {} as Record<string, { label: string; color: string }>)} 
+                    className="h-full w-full [&>div]:!aspect-auto [&>div]:!h-full"
+                  >
+                    <PieChart>
+                      <ChartTooltip 
+                        content={<ChartTooltipContent hideLabel />}
+                      />
+                      <Pie
+                        data={pieChartData.map((item, index) => ({ ...item, fill: `var(--color-value${index})` }))}
+                        cx="50%"
+                        cy="45%"
+                        labelLine={false}
+                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                        outerRadius={90}
+                        innerRadius={50}
+                        dataKey="value"
+                      >
+                        {pieChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={`var(--color-value${index})`} />
+                        ))}
+                      </Pie>
+                      <ChartLegend 
+                        content={<ChartLegendContent nameKey="name" />}
+                        wrapperStyle={{ paddingTop: '20px' }}
+                      />
+                    </PieChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* نمودار برترین محصولات */}
+            <Card className="flex flex-col">
+              <CardHeader className="pb-3 flex-shrink-0">
+                <CardTitle className="text-base font-semibold">محصولات پرفروش</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 min-h-0">
+                {topProductsData.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-muted-foreground/70 text-sm">
+                    داده‌ای برای نمایش وجود ندارد
+                  </div>
+                ) : (
+                  <div className="h-full w-full flex flex-col gap-3">
+                    {topProductsData.map((item, index) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-xs font-bold text-primary">{index + 1}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{item.fullName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {item.sales} فروش • {formatCurrency(item.revenue)}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-primary to-secondary transition-all"
+                              style={{ 
+                                width: `${(item.sales / topProductsData[0].sales) * 100}%` 
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* نمودار میله‌ای عمودی - Monthly Sales */}
+            <Card className="flex flex-col">
+              <CardHeader className="pb-3 flex-shrink-0">
+                <CardTitle className="text-base font-semibold">فروش ماهانه</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 min-h-0">
+                <ChartContainer 
+                  config={{ 
+                    sales: { 
+                      label: "تعداد فروش", 
+                      color: "hsl(var(--chart-3))" 
+                    } 
+                  }} 
+                  className="h-full w-full [&>div]:!aspect-auto [&>div]:!h-full"
+                >
+                    <BarChart data={monthlySalesData} margin={{ top: 5, right: 10, left: 0, bottom: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis 
+                        dataKey="month" 
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tick={{ fontSize: 10 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                        interval={0}
+                      />
+                      <YAxis 
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tick={{ fontSize: 11 }}
+                        allowDecimals={false}
+                        domain={[0, 'dataMax + 1']}
+                      />
+                      <ChartTooltip 
+                        cursor={false}
+                        content={<ChartTooltipContent indicator="line" />}
+                      />
+                      <Bar 
+                        dataKey="sales" 
+                        fill="var(--color-sales)"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ChartContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* بخش کارت‌های اطلاعاتی */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* کارت‌های آماری اضافی */}
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-1 lg:grid-cols-2 sm:col-span-2 lg:col-span-1">
+            <MetricCard
+              title="درآمد کل"
+              value={formatCurrency(stats.totalRevenue)}
+              icon={ShoppingCart}
+              description="قیمت اعلامی فروش‌ها"
+            />
+            <MetricCard
+              title="تعداد فروش"
+              value={toPersianDigits(stats.totalSales)}
+              icon={ShoppingCart}
+              description="تراکنش‌های انجام شده"
+            />
+            <MetricCard
+              title="مشتریان"
+              value={toPersianDigits(stats.activeCustomers)}
+              icon={Users}
+              description="مجموع مشتریان"
+            />
+            <MetricCard
+              title="هزینه‌ها"
+              value={formatCurrency(stats.totalExpenses)}
+              icon={TrendingDown}
+              description="مجموع هزینه‌ها"
+              className="text-destructive"
+            />
+          </div>
+
+          {/* دسترسی سریع */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Zap className="h-4 w-4 text-primary" />
+                دسترسی سریع
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <a href="/sales" className="block p-3 rounded-lg border hover:bg-accent hover:border-primary/50 transition-colors">
+                <div className="font-medium text-sm">ثبت فروش جدید</div>
+                <div className="text-xs text-muted-foreground mt-0.5">ایجاد فروش اقساطی</div>
+              </a>
+              <a href="/installments" className="block p-3 rounded-lg border hover:bg-accent hover:border-primary/50 transition-colors">
+                <div className="font-medium text-sm">مدیریت اقساط</div>
+                <div className="text-xs text-muted-foreground mt-0.5">پیگیری پرداخت‌ها</div>
+              </a>
+              <a href="/partners" className="block p-3 rounded-lg border hover:bg-accent hover:border-primary/50 transition-colors">
+                <div className="font-medium text-sm">مدیریت سرمایه</div>
+                <div className="text-xs text-muted-foreground mt-0.5">افزایش یا برداشت</div>
+              </a>
+            </CardContent>
+          </Card>
+
+          {/* آخرین تراکنش‌ها */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Activity className="h-4 w-4 text-secondary" />
+                آخرین تراکنش‌ها
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {recentTransactions.length === 0 ? (
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  هنوز تراکنشی ثبت نشده است
                 </div>
-                <div className="flex-1 space-y-2">
-                  <h3 className="font-bold text-lg bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              ) : (
+                <div className="space-y-2">
+                  {recentTransactions.map((transaction) => {
+                    const partner = partners.find(p => p.id === transaction.partnerId);
+                    const isWithdraw = transaction.type.includes('withdraw');
+                    
+                    return (
+                      <div
+                        key={transaction.id}
+                        className="flex justify-between items-center p-3 rounded-lg border hover:bg-accent transition-colors"
+                      >
+                        <div className="flex-1 min-w-0 pr-3">
+                          <div className="text-sm font-medium truncate">{partner?.name || 'نامشخص'}</div>
+                          <div className="text-xs text-muted-foreground truncate mt-0.5">{transaction.description}</div>
+                        </div>
+                        <div className={cn(
+                          "text-sm font-semibold px-2.5 py-1 rounded-md whitespace-nowrap",
+                          isWithdraw ? 'text-destructive bg-destructive/10' : 'text-success bg-success/10'
+                        )}>
+                          {isWithdraw ? '−' : '+'}{formatCurrency(transaction.amount)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* کارت تحلیل کسب و کار */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              تحلیل کسب و کار
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="flex justify-between items-center p-3 rounded-lg border hover:bg-accent transition-colors">
+                <span className="text-sm text-muted-foreground font-medium">میانگین ارزش فروش</span>
+                <span className="text-sm font-semibold">
+                  {formatCurrency(stats.totalSales > 0 ? Math.round(stats.totalRevenue / stats.totalSales) : 0)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-3 rounded-lg border hover:bg-accent transition-colors">
+                <span className="text-sm text-muted-foreground font-medium">نسبت سود اولیه</span>
+                <span className="text-sm font-semibold text-success px-2 py-1 bg-success/10 rounded-md">
+                  {toPersianDigits(stats.totalProfit > 0 ? Math.round((stats.initialProfit / stats.totalProfit) * 100) : 0)}%
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-3 rounded-lg border hover:bg-accent transition-colors">
+                <span className="text-sm text-muted-foreground font-medium">نسبت سود ماهانه</span>
+                <span className="text-sm font-semibold text-secondary px-2 py-1 bg-secondary/10 rounded-md">
+                  {toPersianDigits(stats.totalProfit > 0 ? Math.round((stats.monthlyProfit / stats.totalProfit) * 100) : 0)}%
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-3 rounded-lg border hover:bg-accent transition-colors">
+                <span className="text-sm text-muted-foreground font-medium">نسبت سرمایه در دسترس</span>
+                <span className="text-sm font-semibold text-primary px-2 py-1 bg-primary/10 rounded-md">
+                  {toPersianDigits(stats.totalCapital > 0 ? Math.round((stats.availableCapital / stats.totalCapital) * 100) : 0)}%
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* پیام راهنمای شروع */}
+        {stats.totalSales === 0 && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <div className="text-primary mt-0.5">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-sm mb-1">
                     راهنمای شروع
                   </h3>
-                  <p className="text-sm text-muted-foreground/80 leading-relaxed">
+                  <p className="text-sm text-muted-foreground">
                     برای شروع، روی دکمه "بارگذاری داده نمونه" کلیک کنید تا با سیستم آشنا شوید.
-                  </p>
-                  <p className="text-xs text-muted-foreground/70 bg-muted/50 p-2 rounded-lg border border-border/50">
-                    💡 اگر خطایی مشاهده کردید، روی "پاک کردن همه" کلیک کنید و دوباره داده نمونه را بارگذاری کنید.
                   </p>
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <CardHeader className="relative z-10">
-              <CardTitle className="flex items-center gap-2">
-                <div className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-primary to-secondary" />
-                دسترسی سریع
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 relative z-10">
-              <a
-                href="/sales"
-                className="block p-4 border border-border/50 rounded-xl hover:bg-gradient-to-r hover:from-primary/10 hover:to-secondary/10 hover:border-primary/50 transition-all duration-200 hover:scale-[1.02] group/link"
-              >
-                <div className="font-semibold group-hover/link:text-primary transition-colors duration-200">
-                  ثبت فروش جدید
+        {/* AlertDialog پاک کردن تمام داده‌ها */}
+        <AlertDialog open={clearDataDialog} onOpenChange={setClearDataDialog}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-full bg-destructive/10">
+                  <Trash2 className="h-6 w-6 text-destructive" />
                 </div>
-                <div className="text-sm text-muted-foreground/70 mt-1">
-                  ایجاد فروش اقساطی جدید
-                </div>
-              </a>
-              <a
-                href="/installments"
-                className="block p-4 border border-border/50 rounded-xl hover:bg-gradient-to-r hover:from-primary/10 hover:to-secondary/10 hover:border-primary/50 transition-all duration-200 hover:scale-[1.02] group/link"
-              >
-                <div className="font-semibold group-hover/link:text-primary transition-colors duration-200">
-                  مدیریت اقساط
-                </div>
-                <div className="text-sm text-muted-foreground/70 mt-1">
-                  پیگیری و بروزرسانی وضعیت پرداخت
-                </div>
-              </a>
-              <a
-                href="/partners"
-                className="block p-4 border border-border/50 rounded-xl hover:bg-gradient-to-r hover:from-primary/10 hover:to-secondary/10 hover:border-primary/50 transition-all duration-200 hover:scale-[1.02] group/link"
-              >
-                <div className="font-semibold group-hover/link:text-primary transition-colors duration-200">
-                  مدیریت سرمایه
-                </div>
-                <div className="text-sm text-muted-foreground/70 mt-1">
-                  افزایش یا برداشت سرمایه و سود
-                </div>
-              </a>
-            </CardContent>
-          </Card>
-
-          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <CardHeader className="relative z-10">
-              <CardTitle className="flex items-center gap-2">
-                <div className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-primary to-secondary" />
-                آخرین تراکنش‌های مالی
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="relative z-10">
-              {(() => {
-                const allTransactions = transactions
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .slice(0, 5);
-
-                if (allTransactions.length === 0) {
-                  return (
-                    <div className="text-center py-8 text-muted-foreground/70 text-sm">
-                      هنوز تراکنشی ثبت نشده است
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="space-y-2">
-                    {allTransactions.map((transaction, index) => {
-                      const partner = partners.find(p => p.id === transaction.partnerId);
-                      const isWithdraw = transaction.type.includes('withdraw');
-                      
-                      return (
-                        <div
-                          key={transaction.id}
-                          className="flex justify-between items-center p-3 border border-border/50 rounded-lg hover:bg-accent/50 hover:border-primary/30 transition-all duration-200 hover:scale-[1.01] animate-slide-in"
-                          style={{ animationDelay: `${index * 50}ms` }}
-                        >
-                          <div className="flex-1">
-                            <div className="text-sm font-semibold">{partner?.name || 'نامشخص'}</div>
-                            <div className="text-xs text-muted-foreground/70 mt-0.5">
-                              {transaction.description}
-                            </div>
-                          </div>
-                          <div className={`text-sm font-bold px-2 py-1 rounded-md ${
-                            isWithdraw 
-                              ? 'text-destructive bg-destructive/10' 
-                              : 'text-success bg-success/10'
-                          }`}>
-                            {isWithdraw ? '−' : '+'}{formatCurrency(transaction.amount)}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
-
-          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <CardHeader className="relative z-10">
-              <CardTitle className="flex items-center gap-2">
-                <div className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-primary to-secondary" />
-                تحلیل کسب و کار
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="relative z-10">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center p-2 rounded-lg hover:bg-accent/30 transition-colors duration-200">
-                  <span className="text-sm text-muted-foreground/80 font-medium">
-                    میانگین ارزش فروش
-                  </span>
-                  <span className="font-bold text-foreground">
-                    {formatCurrency(stats.totalSales > 0
-                      ? Math.round(stats.totalRevenue / stats.totalSales)
-                      : 0)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center p-2 rounded-lg hover:bg-success/10 transition-colors duration-200">
-                  <span className="text-sm text-muted-foreground/80 font-medium">
-                    نسبت سود اولیه
-                  </span>
-                  <span className="font-bold text-success px-2 py-1 bg-success/10 rounded-md">
-                    {toPersianDigits(stats.totalProfit > 0
-                      ? Math.round((stats.initialProfit / stats.totalProfit) * 100)
-                      : 0)}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center p-2 rounded-lg hover:bg-secondary/10 transition-colors duration-200">
-                  <span className="text-sm text-muted-foreground/80 font-medium">
-                    نسبت سود ماهانه
-                  </span>
-                  <span className="font-bold text-secondary px-2 py-1 bg-secondary/10 rounded-md">
-                    {toPersianDigits(stats.totalProfit > 0
-                      ? Math.round((stats.monthlyProfit / stats.totalProfit) * 100)
-                      : 0)}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pt-3 border-t border-border/50 p-2 rounded-lg hover:bg-accent/30 transition-colors duration-200">
-                  <span className="text-sm text-muted-foreground/80 font-medium">
-                    نسبت سرمایه در دسترس
-                  </span>
-                  <span className="font-bold text-foreground px-2 py-1 bg-primary/10 rounded-md">
-                    {toPersianDigits(stats.totalCapital > 0
-                      ? Math.round((stats.availableCapital / stats.totalCapital) * 100)
-                      : 0)}%
-                  </span>
-                </div>
+                <AlertDialogTitle className="text-xl font-bold bg-gradient-to-r from-destructive to-destructive/80 bg-clip-text text-transparent">
+                  پاک کردن تمام داده‌ها
+                </AlertDialogTitle>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <AlertDialogDescription className="text-right space-y-3 pt-2">
+                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="text-sm font-semibold text-destructive mb-2 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    هشدار مهم
+                  </p>
+                  <p className="text-sm text-foreground mb-3">
+                    تمام داده‌های زیر پاک خواهند شد:
+                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>شرکا و سرمایه‌ها</li>
+                    <li>سرمایه‌گذاران</li>
+                    <li>موجودی گوشی‌ها</li>
+                    <li>فروش‌ها و اقساط</li>
+                    <li>مشتریان</li>
+                    <li>هزینه‌ها</li>
+                    <li>تراکنش‌ها</li>
+                  </ul>
+                </div>
+                <p className="text-base font-semibold text-destructive">
+                  این عمل غیرقابل بازگشت است!
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  آیا مطمئن هستید که می‌خواهید تمام داده‌ها را پاک کنید؟
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:gap-0">
+              <AlertDialogCancel className="hover:bg-accent hover:text-accent-foreground">
+                انصراف
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  setClearDataDialog(false);
+                  toast({
+                    title: "در حال پاک کردن...",
+                    description: "لطفاً صبر کنید",
+                  });
+                  const success = await clearAllData();
+                  if (!success) {
+                    toast({
+                      title: "خطا",
+                      description: "خطا در پاک کردن داده‌ها",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                <Trash2 className="h-4 w-4 ml-2" />
+                پاک کردن
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

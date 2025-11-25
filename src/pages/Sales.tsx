@@ -11,6 +11,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -43,7 +53,7 @@ import {
   deductCapitalForPurchase,
   addInitialProfitToPartners
 } from "@/lib/profitCalculator";
-import { Plus, ShoppingCart, TrendingUp, Trash2, Eye } from "lucide-react";
+import { Plus, ShoppingCart, TrendingUp, Trash2, Eye, User, Smartphone, DollarSign, Calendar, CreditCard, TrendingDown, CheckCircle2, Clock, AlertCircle, FileText, Percent, Hash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +67,7 @@ const Sales = () => {
   const [loadingMessage, setLoadingMessage] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; saleId: string }>({ open: false, saleId: '' });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; saleId: string; saleInfo: string }>({ open: false, saleId: '', saleInfo: '' });
   const [formData, setFormData] = useState({
     customerId: "",
     phoneId: "", // گوشی از موجودی
@@ -175,26 +186,31 @@ const Sales = () => {
     formData.customProfitRate
   ]);
 
-  const handleDeleteSale = async (saleId: string) => {
-    if (!confirm("⚠️ هشدار: با حذف این فروش، تمام اقساط مرتبط نیز حذف می‌شوند.\n\nآیا مطمئن هستید؟")) {
-      return;
-    }
+  const handleDeleteSale = (saleId: string) => {
+    const sale = sales.find(s => s.id === saleId);
+    const customer = customers.find(c => c.id === sale?.customerId);
+    const phone = phones.find(p => p.id === sale?.phoneId);
+    const saleInfo = sale ? `${customer?.name || 'نامشخص'} - ${phone ? `${phone.brand} ${phone.model}` : 'نامشخص'}` : '';
+    setDeleteDialog({ open: true, saleId, saleInfo });
+  };
 
+  const confirmDeleteSale = async () => {
     try {
       // حذف اقساط مرتبط
-      const saleInstallments = await installmentsStore.getBySaleId(saleId);
+      const saleInstallments = await installmentsStore.getBySaleId(deleteDialog.saleId);
       for (const inst of saleInstallments) {
         await installmentsStore.delete(inst.id);
       }
 
       // حذف فروش
-      await salesStore.delete(saleId);
+      await salesStore.delete(deleteDialog.saleId);
 
       toast({
         title: "موفق",
         description: "فروش و اقساط مرتبط با موفقیت حذف شدند",
       });
 
+      setDeleteDialog({ open: false, saleId: '', saleInfo: '' });
       loadSales();
     } catch (error) {
       console.error('Error deleting sale:', error);
@@ -855,9 +871,11 @@ const Sales = () => {
 
         {/* Dialog جزئیات فروش */}
         <Dialog open={detailsDialog.open} onOpenChange={(open) => setDetailsDialog({ ...detailsDialog, open })}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>جزئیات فروش</DialogTitle>
+              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
+                جزئیات فروش
+              </DialogTitle>
             </DialogHeader>
             {(() => {
               const sale = sales.find(s => s.id === detailsDialog.saleId);
@@ -867,82 +885,342 @@ const Sales = () => {
               const phone = phones.find(p => p.id === sale.phoneId);
               const saleInstallments = installments.filter(i => i.saleId === sale.id);
               
+              const paidCount = saleInstallments.filter(i => i.status === 'paid').length;
+              const pendingCount = saleInstallments.filter(i => i.status === 'pending').length;
+              const overdueCount = saleInstallments.filter(i => i.status === 'overdue').length;
+              const totalPaid = saleInstallments.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.totalAmount, 0);
+              const totalPending = saleInstallments.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((sum, i) => sum + i.totalAmount, 0);
+              const progressPercentage = saleInstallments.length > 0 ? (paidCount / saleInstallments.length) * 100 : 0;
+              
               return (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-sm text-muted-foreground">مشتری</div>
-                      <div className="font-semibold">{customer?.name}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">گوشی</div>
-                      <div className="font-semibold">
-                        {phone ? `${phone.brand} ${phone.model}` : 'نامشخص'}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">قیمت خرید</div>
-                      <div className="font-semibold">{formatCurrency(sale.purchasePrice)}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">قیمت اعلامی</div>
-                      <div className="font-semibold">{formatCurrency(sale.announcedPrice)}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">سود اولیه</div>
-                      <div className="font-semibold text-success">{formatCurrency(sale.initialProfit)}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">پیش‌پرداخت</div>
-                      <div className="font-semibold">{formatCurrency(sale.downPayment)}</div>
-                    </div>
+                <div className="space-y-6">
+                  {/* خلاصه آماری */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <Card className="relative overflow-hidden bg-gradient-to-br from-success/10 via-success/5 to-transparent border-success/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">پرداخت شده</div>
+                            <div className="text-lg font-bold text-success">{toPersianDigits(paidCount)}</div>
+                          </div>
+                          <CheckCircle2 className="h-8 w-8 text-success/40" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="relative overflow-hidden bg-gradient-to-br from-warning/10 via-warning/5 to-transparent border-warning/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">در انتظار</div>
+                            <div className="text-lg font-bold text-warning">{toPersianDigits(pendingCount)}</div>
+                          </div>
+                          <Clock className="h-8 w-8 text-warning/40" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="relative overflow-hidden bg-gradient-to-br from-destructive/10 via-destructive/5 to-transparent border-destructive/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">معوق</div>
+                            <div className="text-lg font-bold text-destructive">{toPersianDigits(overdueCount)}</div>
+                          </div>
+                          <AlertCircle className="h-8 w-8 text-destructive/40" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">پیشرفت</div>
+                            <div className="text-lg font-bold text-primary">{toPersianDigits(Math.round(progressPercentage))}%</div>
+                          </div>
+                          <TrendingUp className="h-8 w-8 text-primary/40" />
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
 
-                  <div className="pt-4 border-t">
-                    <h3 className="font-semibold mb-3">جدول اقساط</h3>
-                    <div className="space-y-2">
-                      {saleInstallments.map((inst, index) => (
+                  {/* Progress Bar */}
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">پیشرفت پرداخت</span>
+                        <span className="text-sm text-muted-foreground">
+                          {toPersianDigits(paidCount)} از {toPersianDigits(saleInstallments.length)} قسط
+                        </span>
+                      </div>
+                      <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
                         <div 
-                          key={inst.id} 
-                          className="flex items-center justify-between p-3 border border-border/50 rounded-lg hover:bg-accent/30 hover:border-primary/30 transition-all duration-200 hover:scale-[1.01] animate-slide-in"
-                          style={{ animationDelay: `${index * 30}ms` }}
-                        >
-                          <div className="flex-1">
-                            <div className="font-semibold">قسط {toPersianDigits(inst.installmentNumber)}</div>
-                            <div className="text-xs text-muted-foreground/70 mt-0.5">
-                              سررسید: {toJalaliDate(inst.dueDate)}
-                            </div>
+                          className="h-full bg-gradient-to-r from-success via-success/80 to-success transition-all duration-500"
+                          style={{ width: `${progressPercentage}%` }}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* اطلاعات اصلی */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <Card className="relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <CardHeader className="relative z-10 pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-primary/20 rounded-lg blur-sm" />
+                            <User className="relative h-4 w-4 text-primary" />
                           </div>
-                          <div className="text-right space-y-1">
-                            <div className="text-sm font-medium">
-                              اصل: {formatCurrency(inst.principalAmount)}
-                            </div>
-                            <div className="text-sm text-secondary font-medium">
-                              سود: {formatCurrency(inst.interestAmount)}
-                            </div>
-                            <div className="font-bold text-primary">
-                              مجموع: {formatCurrency(inst.totalAmount)}
-                            </div>
+                          اطلاعات مشتری
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="relative z-10 space-y-3">
+                        <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">نام مشتری</span>
                           </div>
-                          <Badge 
-                            variant={inst.status === 'paid' ? 'default' : inst.status === 'overdue' ? 'destructive' : 'secondary'}
-                            className={cn(
-                              inst.status === 'paid' && "bg-success/10 text-success border-success/20",
-                              inst.status === 'overdue' && "bg-destructive/10 text-destructive border-destructive/20",
-                              inst.status === 'pending' && "bg-warning/10 text-warning border-warning/20"
-                            )}
-                          >
-                            {inst.status === 'paid' ? 'پرداخت شده' : inst.status === 'overdue' ? 'معوق' : 'در انتظار'}
-                          </Badge>
+                          <span className="font-semibold">{customer?.name || 'نامشخص'}</span>
                         </div>
-                      ))}
-                    </div>
+                        {customer?.phone && (
+                          <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                            <div className="flex items-center gap-2">
+                              <CreditCard className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">شماره تماس</span>
+                            </div>
+                            <span className="font-medium">{customer.phone}</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card className="relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <CardHeader className="relative z-10 pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-secondary/20 rounded-lg blur-sm" />
+                            <Smartphone className="relative h-4 w-4 text-secondary" />
+                          </div>
+                          اطلاعات محصول
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="relative z-10 space-y-3">
+                        <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <Smartphone className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">محصول</span>
+                          </div>
+                          <span className="font-semibold">
+                            {phone ? `${phone.brand} ${phone.model}` : 'نامشخص'}
+                          </span>
+                        </div>
+                        {phone?.imei && (
+                          <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                            <div className="flex items-center gap-2">
+                              <Hash className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">IMEI</span>
+                            </div>
+                            <span className="font-mono text-xs">{phone.imei}</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   </div>
+
+                  {/* اطلاعات مالی */}
+                  <Card className="relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-success/5 via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <CardHeader className="relative z-10 pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                        <div className="relative">
+                          <div className="absolute inset-0 bg-success/20 rounded-lg blur-sm" />
+                          <DollarSign className="relative h-4 w-4 text-success" />
+                        </div>
+                        اطلاعات مالی
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="relative z-10">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div className="p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="text-xs text-muted-foreground mb-1">قیمت خرید</div>
+                          <div className="font-semibold">{formatCurrency(sale.purchasePrice)}</div>
+                        </div>
+                        <div className="p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="text-xs text-muted-foreground mb-1">قیمت اعلامی</div>
+                          <div className="font-semibold text-primary">{formatCurrency(sale.announcedPrice)}</div>
+                        </div>
+                        <div className="p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="text-xs text-muted-foreground mb-1">سود اولیه</div>
+                          <div className="font-semibold text-success">{formatCurrency(sale.initialProfit)}</div>
+                        </div>
+                        <div className="p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="text-xs text-muted-foreground mb-1">پیش‌پرداخت</div>
+                          <div className="font-semibold">{formatCurrency(sale.downPayment)}</div>
+                        </div>
+                        <div className="p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="text-xs text-muted-foreground mb-1">پرداخت شده</div>
+                          <div className="font-semibold text-success">{formatCurrency(totalPaid)}</div>
+                        </div>
+                        <div className="p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="text-xs text-muted-foreground mb-1">باقیمانده</div>
+                          <div className="font-semibold text-warning">{formatCurrency(totalPending)}</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* جدول اقساط */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                        <FileText className="h-4 w-4 text-primary" />
+                        جدول اقساط
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {saleInstallments.map((inst, index) => {
+                          const StatusIcon = inst.status === 'paid' ? CheckCircle2 : inst.status === 'overdue' ? AlertCircle : Clock;
+                          const statusColor = inst.status === 'paid' ? 'text-success' : inst.status === 'overdue' ? 'text-destructive' : 'text-warning';
+                          
+                          return (
+                            <div 
+                              key={inst.id} 
+                              className={cn(
+                                "flex items-center justify-between p-4 rounded-lg border transition-all duration-200 hover:scale-[1.01]",
+                                inst.status === 'paid' && "bg-success/5 border-success/20",
+                                inst.status === 'overdue' && "bg-destructive/5 border-destructive/20",
+                                inst.status === 'pending' && "bg-warning/5 border-warning/20 hover:bg-warning/10"
+                              )}
+                              style={{ animationDelay: `${index * 30}ms` }}
+                            >
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className={cn("p-2 rounded-lg", inst.status === 'paid' ? "bg-success/10" : inst.status === 'overdue' ? "bg-destructive/10" : "bg-warning/10")}>
+                                  <StatusIcon className={cn("h-4 w-4", statusColor)} />
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-semibold">قسط {toPersianDigits(inst.installmentNumber)}</span>
+                                    <Badge 
+                                      variant="outline"
+                                      className={cn(
+                                        "text-xs",
+                                        inst.status === 'paid' && "bg-success/10 text-success border-success/20",
+                                        inst.status === 'overdue' && "bg-destructive/10 text-destructive border-destructive/20",
+                                        inst.status === 'pending' && "bg-warning/10 text-warning border-warning/20"
+                                      )}
+                                    >
+                                      {inst.status === 'paid' ? 'پرداخت شده' : inst.status === 'overdue' ? 'معوق' : 'در انتظار'}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Calendar className="h-3 w-3" />
+                                    سررسید: {toJalaliDate(inst.dueDate)}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-left space-y-1 min-w-[140px]">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-muted-foreground">اصل:</span>
+                                  <span className="font-medium">{formatCurrency(inst.principalAmount)}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-muted-foreground">سود:</span>
+                                  <span className="font-medium text-secondary">{formatCurrency(inst.interestAmount)}</span>
+                                </div>
+                                <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                                  <span className="text-xs font-semibold text-muted-foreground">مجموع:</span>
+                                  <span className="font-bold text-primary">{formatCurrency(inst.totalAmount)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               );
             })()}
           </DialogContent>
         </Dialog>
+
+        {/* AlertDialog حذف فروش */}
+        <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+          <AlertDialogContent className="max-w-lg p-0 gap-0 overflow-hidden border-destructive/20">
+            {/* Header با gradient */}
+            <div className="relative bg-gradient-to-br from-destructive via-destructive/90 to-destructive/80 p-6">
+              <div className="absolute inset-0 bg-black/10" />
+              <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse" />
+                  <div className="relative p-4 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20">
+                    <Trash2 className="h-10 w-10 text-white" />
+                  </div>
+                </div>
+                <AlertDialogTitle className="text-2xl font-bold text-white">
+                  حذف فروش
+                </AlertDialogTitle>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 bg-background">
+              <AlertDialogDescription className="text-right space-y-4">
+                <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
+                  <p className="text-base font-semibold text-foreground mb-2">
+                    فروش مورد نظر:
+                  </p>
+                  <p className="text-lg font-bold text-primary bg-primary/10 px-3 py-2 rounded-md inline-block">
+                    {deleteDialog.saleInfo}
+                  </p>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-warning/10 border border-warning/30">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-full bg-warning/20 flex-shrink-0">
+                      <AlertCircle className="h-5 w-5 text-warning" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-semibold text-warning">
+                        هشدار مهم
+                      </p>
+                      <p className="text-sm text-foreground leading-relaxed">
+                        با حذف این فروش، تمام موارد زیر نیز حذف خواهند شد:
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside mr-4">
+                        <li>تمام اقساط مرتبط</li>
+                        <li>اطلاعات پرداخت‌ها</li>
+                        <li>تاریخچه تراکنش‌ها</li>
+                      </ul>
+                      <p className="text-sm font-semibold text-destructive mt-2">
+                        این عمل غیرقابل بازگشت است!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-center text-sm text-muted-foreground pt-2">
+                  آیا از حذف این فروش اطمینان دارید؟
+                </p>
+              </AlertDialogDescription>
+            </div>
+
+            {/* Footer */}
+            <AlertDialogFooter className="p-6 pt-0 gap-3 bg-background">
+              <AlertDialogCancel className="flex-1 h-11 text-base font-semibold border-2 hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200">
+                انصراف
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteSale}
+                className="flex-1 h-11 text-base font-semibold bg-gradient-to-r from-destructive to-destructive/80 hover:from-destructive/90 hover:to-destructive/70 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <Trash2 className="h-4 w-4 ml-2" />
+                حذف فروش
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

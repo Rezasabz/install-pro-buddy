@@ -13,6 +13,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -47,6 +57,8 @@ const Installments = () => {
   const [selectedSaleId, setSelectedSaleId] = useState<string>("");
   const [saleDetailsDialog, setSaleDetailsDialog] = useState<{ open: boolean; saleId: string }>({ open: false, saleId: '' });
   const [bulkPaymentDialog, setBulkPaymentDialog] = useState<{ open: boolean; saleId: string }>({ open: false, saleId: '' });
+  const [cancelPaymentDialog, setCancelPaymentDialog] = useState<{ open: boolean; installmentId: string; installmentInfo: string }>({ open: false, installmentId: '', installmentInfo: '' });
+  const [bulkPaymentConfirmDialog, setBulkPaymentConfirmDialog] = useState<{ open: boolean; saleId: string; installmentsCount: number; totalAmount: number; totalPrincipal: number; totalInterest: number }>({ open: false, saleId: '', installmentsCount: 0, totalAmount: 0, totalPrincipal: 0, totalInterest: 0 });
   const [selectedInstallments, setSelectedInstallments] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { refreshPartners, refreshDashboard } = useDataContext();
@@ -193,17 +205,23 @@ const Installments = () => {
     }
   };
 
-  const handleCancelPayment = async (installmentId: string) => {
+  const handleCancelPayment = (installmentId: string) => {
     const installment = installments.find(i => i.id === installmentId);
     if (!installment || installment.status !== 'paid') return;
 
-    if (!confirm("⚠️ آیا از لغو این پرداخت اطمینان دارید؟\n\nسرمایه و سود به حالت قبل برمی‌گردند.")) {
-      return;
-    }
+    const sale = sales.find(s => s.id === installment.saleId);
+    const customer = customers.find(c => c.id === sale?.customerId);
+    const installmentInfo = `قسط ${toPersianDigits(installment.installmentNumber)} - ${customer?.name || 'نامشخص'}`;
+    setCancelPaymentDialog({ open: true, installmentId, installmentInfo });
+  };
 
+  const confirmCancelPayment = async () => {
     try {
+      const installment = installments.find(i => i.id === cancelPaymentDialog.installmentId);
+      if (!installment) return;
+
       // لغو پرداخت
-      await installmentsStore.update(installmentId, {
+      await installmentsStore.update(cancelPaymentDialog.installmentId, {
         status: 'pending',
         paidDate: undefined,
       });
@@ -278,9 +296,20 @@ const Installments = () => {
     const totalPrincipal = installmentsToPayArray.reduce((sum, i) => sum + i.principalAmount, 0);
     const totalInterest = installmentsToPayArray.reduce((sum, i) => sum + i.interestAmount, 0);
 
-    if (!confirm(`پرداخت ${toPersianDigits(installmentsToPayArray.length)} قسط\n\nمجموع: ${formatCurrency(totalAmount)}\nاصل: ${formatCurrency(totalPrincipal)}\nسود: ${formatCurrency(totalInterest)}\n\nآیا مطمئن هستید؟`)) {
-      return;
-    }
+    setBulkPaymentConfirmDialog({
+      open: true,
+      saleId: bulkPaymentDialog.saleId,
+      installmentsCount: installmentsToPayArray.length,
+      totalAmount,
+      totalPrincipal,
+      totalInterest,
+    });
+  };
+
+  const confirmBulkPayment = async () => {
+    const installmentsToPayArray = Array.from(selectedInstallments)
+      .map(id => installments.find(i => i.id === id))
+      .filter(i => i && i.status !== 'paid') as Installment[];
 
     installmentsToPayArray.forEach(installment => {
       handlePayment(installment.id);
@@ -288,6 +317,7 @@ const Installments = () => {
 
     setSelectedInstallments(new Set());
     setBulkPaymentDialog({ open: false, saleId: '' });
+    setBulkPaymentConfirmDialog({ open: false, saleId: '', installmentsCount: 0, totalAmount: 0, totalPrincipal: 0, totalInterest: 0 });
 
     toast({
       title: "موفق",
@@ -904,6 +934,161 @@ const Installments = () => {
             </CardContent>
           </Card>
         )}
+        {/* AlertDialog لغو پرداخت */}
+        <AlertDialog open={cancelPaymentDialog.open} onOpenChange={(open) => setCancelPaymentDialog({ ...cancelPaymentDialog, open })}>
+          <AlertDialogContent className="max-w-lg p-0 gap-0 overflow-hidden border-warning/20">
+            {/* Header با gradient */}
+            <div className="relative bg-gradient-to-br from-warning via-warning/90 to-warning/80 p-6">
+              <div className="absolute inset-0 bg-black/10" />
+              <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse" />
+                  <div className="relative p-4 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20">
+                    <AlertCircle className="h-10 w-10 text-white" />
+                  </div>
+                </div>
+                <AlertDialogTitle className="text-2xl font-bold text-white">
+                  لغو پرداخت
+                </AlertDialogTitle>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 bg-background">
+              <AlertDialogDescription className="text-right space-y-4">
+                <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
+                  <p className="text-base font-semibold text-foreground mb-2">
+                    قسط مورد نظر:
+                  </p>
+                  <p className="text-lg font-bold text-primary bg-primary/10 px-3 py-2 rounded-md inline-block">
+                    {cancelPaymentDialog.installmentInfo}
+                  </p>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-warning/10 border border-warning/30">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-full bg-warning/20 flex-shrink-0">
+                      <AlertCircle className="h-5 w-5 text-warning" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-semibold text-warning">
+                        هشدار مهم
+                      </p>
+                      <p className="text-sm text-foreground leading-relaxed">
+                        با لغو این پرداخت، موارد زیر به حالت قبل برمی‌گردند:
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside mr-4">
+                        <li>سرمایه از حساب شرکا کسر می‌شود</li>
+                        <li>سود ماهانه از حساب شرکا کسر می‌شود</li>
+                        <li>وضعیت فروش به "فعال" تغییر می‌کند</li>
+                      </ul>
+                      <p className="text-sm font-semibold text-warning mt-2">
+                        این عمل قابل بازگشت است اما تغییرات مالی اعمال می‌شود.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-center text-sm text-muted-foreground pt-2">
+                  آیا از لغو این پرداخت اطمینان دارید؟
+                </p>
+              </AlertDialogDescription>
+            </div>
+
+            {/* Footer */}
+            <AlertDialogFooter className="p-6 pt-0 gap-3 bg-background">
+              <AlertDialogCancel className="flex-1 h-11 text-base font-semibold border-2 hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200">
+                انصراف
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmCancelPayment}
+                className="flex-1 h-11 text-base font-semibold bg-gradient-to-r from-warning to-warning/80 hover:from-warning/90 hover:to-warning/70 text-warning-foreground shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <AlertCircle className="h-4 w-4 ml-2" />
+                لغو پرداخت
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* AlertDialog تایید پرداخت دسته‌ای */}
+        <AlertDialog open={bulkPaymentConfirmDialog.open} onOpenChange={(open) => setBulkPaymentConfirmDialog({ ...bulkPaymentConfirmDialog, open })}>
+          <AlertDialogContent className="max-w-lg p-0 gap-0 overflow-hidden border-success/20">
+            {/* Header با gradient */}
+            <div className="relative bg-gradient-to-br from-success via-success/90 to-success/80 p-6">
+              <div className="absolute inset-0 bg-black/10" />
+              <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse" />
+                  <div className="relative p-4 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20">
+                    <CheckCircle className="h-10 w-10 text-white" />
+                  </div>
+                </div>
+                <AlertDialogTitle className="text-2xl font-bold text-white">
+                  تایید پرداخت دسته‌ای
+                </AlertDialogTitle>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 bg-background">
+              <AlertDialogDescription className="text-right space-y-4">
+                <div className="p-4 rounded-lg bg-success/5 border border-success/20 space-y-3">
+                  <div className="flex justify-between items-center pb-2 border-b border-border/50">
+                    <span className="text-sm font-semibold text-muted-foreground">تعداد اقساط:</span>
+                    <span className="text-lg font-bold text-foreground">{toPersianDigits(bulkPaymentConfirmDialog.installmentsCount)} قسط</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">اصل:</span>
+                    <span className="font-semibold text-primary text-base">{formatCurrency(bulkPaymentConfirmDialog.totalPrincipal)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">سود:</span>
+                    <span className="font-semibold text-secondary text-base">{formatCurrency(bulkPaymentConfirmDialog.totalInterest)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t border-border/50">
+                    <span className="text-base font-bold text-foreground">مجموع:</span>
+                    <span className="text-xl font-bold text-success">{formatCurrency(bulkPaymentConfirmDialog.totalAmount)}</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-success/5 border border-success/20">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-full bg-success/10 flex-shrink-0">
+                      <CheckCircle className="h-5 w-5 text-success" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <p className="text-sm font-semibold text-success">
+                        اطلاعات پرداخت
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        با تایید این پرداخت، سرمایه و سود به حساب شرکا اضافه خواهد شد.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-center text-sm text-muted-foreground pt-2">
+                  آیا از پرداخت این اقساط اطمینان دارید؟
+                </p>
+              </AlertDialogDescription>
+            </div>
+
+            {/* Footer */}
+            <AlertDialogFooter className="p-6 pt-0 gap-3 bg-background">
+              <AlertDialogCancel className="flex-1 h-11 text-base font-semibold border-2 hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200">
+                انصراف
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmBulkPayment}
+                className="flex-1 h-11 text-base font-semibold bg-gradient-to-r from-success to-success/80 hover:from-success/90 hover:to-success/70 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <CheckCircle className="h-4 w-4 ml-2" />
+                تایید و پرداخت
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

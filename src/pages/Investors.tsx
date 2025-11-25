@@ -9,6 +9,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +29,7 @@ import {
   InvestorTransaction,
 } from "@/lib/storeProvider";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
-import { Plus, TrendingUp, DollarSign, Trash2, Eye } from "lucide-react";
+import { Plus, TrendingUp, DollarSign, Trash2, Eye, User, Phone, IdCard, Calendar, Percent, Wallet, CheckCircle2, FileText, ArrowUp, ArrowDown, Activity, CreditCard, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { JalaliDatePicker } from "@/components/JalaliDatePicker";
@@ -29,6 +39,7 @@ const Investors = () => {
   const [transactions, setTransactions] = useState<InvestorTransaction[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; investorId: string }>({ open: false, investorId: '' });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; investorId: string; investorName: string }>({ open: false, investorId: '', investorName: '' });
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -139,17 +150,18 @@ const Investors = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف این سرمایه‌گذار مطمئن هستید؟")) {
-      return;
-    }
+  const handleDelete = (id: string, name: string) => {
+    setDeleteDialog({ open: true, investorId: id, investorName: name });
+  };
 
+  const confirmDelete = async () => {
     try {
-      await investorsStore.delete(id);
+      await investorsStore.delete(deleteDialog.investorId);
       toast({
         title: "موفق",
         description: "سرمایه‌گذار حذف شد",
       });
+      setDeleteDialog({ open: false, investorId: '', investorName: '' });
       await loadData();
     } catch (error) {
       console.error('Error deleting investor:', error);
@@ -184,70 +196,128 @@ const Investors = () => {
                 افزودن سرمایه‌گذار
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>افزودن سرمایه‌گذار جدید</DialogTitle>
+                <DialogTitle className="text-xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent flex items-center gap-2">
+                  <Plus className="h-5 w-5 text-primary" />
+                  افزودن سرمایه‌گذار جدید
+                </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">نام</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="phone">شماره تماس</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="nationalId">کد ملی</Label>
-                  <Input
-                    id="nationalId"
-                    value={formData.nationalId}
-                    onChange={(e) => setFormData({ ...formData, nationalId: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="investmentAmount">مبلغ سرمایه‌گذاری (تومان)</Label>
-                  <Input
-                    id="investmentAmount"
-                    type="text"
-                    value={formData.investmentAmount}
-                    onChange={handleInvestmentAmountChange}
-                    placeholder="مثال: ۱۰,۰۰۰,۰۰۰"
-                    required
-                    dir="ltr"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="profitRate">درصد سود (پیش‌فرض ۴٪)</Label>
-                  <Input
-                    id="profitRate"
-                    type="number"
-                    step="0.1"
-                    value={formData.profitRate}
-                    onChange={(e) => setFormData({ ...formData, profitRate: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="startDate">تاریخ شروع</Label>
-                  <JalaliDatePicker
-                    value={startDate}
-                    onChange={setStartDate}
-                    placeholder="انتخاب تاریخ شروع"
-                  />
-                </div>
-                <Button type="submit" className="w-full">
+                {/* اطلاعات شخصی */}
+                <Card className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 border-primary/20">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <User className="h-4 w-4 text-primary" />
+                      اطلاعات شخصی
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="name" className="text-sm font-semibold flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        نام
+                      </Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        required
+                        placeholder="نام و نام خانوادگی"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-sm font-semibold flex items-center gap-2">
+                        <Phone className="h-4 w-4" />
+                        شماره تماس
+                      </Label>
+                      <Input
+                        id="phone"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        required
+                        placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="nationalId" className="text-sm font-semibold flex items-center gap-2">
+                        <IdCard className="h-4 w-4" />
+                        کد ملی
+                      </Label>
+                      <Input
+                        id="nationalId"
+                        value={formData.nationalId}
+                        onChange={(e) => setFormData({ ...formData, nationalId: e.target.value })}
+                        required
+                        placeholder="۱۰ رقم"
+                        maxLength={10}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* اطلاعات سرمایه‌گذاری */}
+                <Card className="relative overflow-hidden bg-gradient-to-br from-success/5 via-transparent to-primary/5 border-success/20">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-success" />
+                      اطلاعات سرمایه‌گذاری
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="investmentAmount" className="text-sm font-semibold flex items-center gap-2">
+                        <Wallet className="h-4 w-4" />
+                        مبلغ سرمایه‌گذاری (تومان)
+                      </Label>
+                      <Input
+                        id="investmentAmount"
+                        type="text"
+                        value={formData.investmentAmount}
+                        onChange={handleInvestmentAmountChange}
+                        placeholder="مثال: ۱۰,۰۰۰,۰۰۰"
+                        required
+                        dir="ltr"
+                        className="text-lg font-semibold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="profitRate" className="text-sm font-semibold flex items-center gap-2">
+                        <Percent className="h-4 w-4" />
+                        درصد سود
+                      </Label>
+                      <Input
+                        id="profitRate"
+                        type="number"
+                        step="0.1"
+                        value={formData.profitRate}
+                        onChange={(e) => setFormData({ ...formData, profitRate: e.target.value })}
+                        required
+                        placeholder="پیش‌فرض: ۴٪"
+                        className="text-lg font-semibold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="startDate" className="text-sm font-semibold flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        تاریخ شروع
+                      </Label>
+                      <JalaliDatePicker
+                        value={startDate}
+                        onChange={setStartDate}
+                        placeholder="انتخاب تاریخ شروع"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* دکمه ثبت */}
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary via-secondary to-primary hover:opacity-90 transition-all duration-200 shadow-lg hover:shadow-xl"
+                >
+                  <CheckCircle2 className="h-4 w-4 ml-2" />
                   ثبت سرمایه‌گذار
                 </Button>
               </form>
@@ -351,7 +421,7 @@ const Investors = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDelete(investor.id)}
+                        onClick={() => handleDelete(investor.id, investor.name)}
                         className="text-destructive hover:text-destructive hover:bg-destructive/10 hover:scale-110 transition-all duration-200"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -415,89 +485,334 @@ const Investors = () => {
 
         {/* Dialog جزئیات سرمایه‌گذار */}
         <Dialog open={detailsDialog.open} onOpenChange={(open) => setDetailsDialog({ ...detailsDialog, open })}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>جزئیات سرمایه‌گذار</DialogTitle>
+              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
+                جزئیات سرمایه‌گذار
+              </DialogTitle>
             </DialogHeader>
             {(() => {
               const investor = investors.find(i => i.id === detailsDialog.investorId);
               if (!investor) return null;
               
               const investorTransactions = transactions.filter(t => t.investorId === investor.id);
+              const profitTransactions = investorTransactions.filter(t => t.type === 'profit_payment');
+              const totalProfitPaid = profitTransactions.reduce((sum, t) => sum + t.amount, 0);
+              const returnPercentage = investor.investmentAmount > 0 
+                ? (investor.totalProfit / investor.investmentAmount) * 100 
+                : 0;
               
               return (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-sm text-muted-foreground">نام</div>
-                      <div className="font-semibold">{investor.name}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">شماره تماس</div>
-                      <div className="font-semibold">{toPersianDigits(investor.phone)}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">کد ملی</div>
-                      <div className="font-semibold">{toPersianDigits(investor.nationalId)}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">مبلغ سرمایه‌گذاری</div>
-                      <div className="font-semibold">{formatCurrency(investor.investmentAmount)}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">درصد سود</div>
-                      <div className="font-semibold">{toPersianDigits(investor.profitRate.toString())}٪</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">کل سود دریافتی</div>
-                      <div className="font-semibold text-success">{formatCurrency(investor.totalProfit)}</div>
-                    </div>
+                <div className="space-y-6">
+                  {/* خلاصه آماری */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <Card className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">سرمایه‌گذاری</div>
+                            <div className="text-lg font-bold text-primary">{formatCurrency(investor.investmentAmount)}</div>
+                          </div>
+                          <Wallet className="h-8 w-8 text-primary/40" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="relative overflow-hidden bg-gradient-to-br from-success/10 via-success/5 to-transparent border-success/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">کل سود</div>
+                            <div className="text-lg font-bold text-success">{formatCurrency(investor.totalProfit)}</div>
+                          </div>
+                          <TrendingUp className="h-8 w-8 text-success/40" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="relative overflow-hidden bg-gradient-to-br from-secondary/10 via-secondary/5 to-transparent border-secondary/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">بازدهی</div>
+                            <div className="text-lg font-bold text-secondary">{toPersianDigits(returnPercentage.toFixed(2))}%</div>
+                          </div>
+                          <Percent className="h-8 w-8 text-secondary/40" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="relative overflow-hidden bg-gradient-to-br from-warning/10 via-warning/5 to-transparent border-warning/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">پرداخت‌ها</div>
+                            <div className="text-lg font-bold text-warning">{toPersianDigits(profitTransactions.length)}</div>
+                          </div>
+                          <Activity className="h-8 w-8 text-warning/40" />
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
 
-                  <div className="pt-4 border-t">
-                    <h3 className="font-semibold mb-3">تاریخچه تراکنش‌ها</h3>
-                    <div className="space-y-2">
-                      {investorTransactions.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          هنوز تراکنشی ثبت نشده است
-                        </p>
-                      ) : (
-                        investorTransactions.map((trans, index) => (
-                          <div 
-                            key={trans.id} 
-                            className="flex items-center justify-between p-3 border border-border/50 rounded-lg hover:bg-accent/30 hover:border-primary/30 transition-all duration-200 hover:scale-[1.01] animate-slide-in"
-                            style={{ animationDelay: `${index * 50}ms` }}
-                          >
-                            <div className="flex-1">
-                              <div className="font-semibold">
-                                {trans.type === 'profit_payment' ? 'پرداخت سود' : 
-                                 trans.type === 'investment_add' ? 'افزایش سرمایه' : 'برداشت سرمایه'}
-                              </div>
-                              <div className="text-xs text-muted-foreground/70 mt-0.5">
-                                {toJalaliDate(trans.date)}
-                              </div>
-                              {trans.description && (
-                                <div className="text-xs text-muted-foreground/60 mt-1">
-                                  {trans.description}
-                                </div>
-                              )}
-                            </div>
-                            <div className={`font-bold px-2 py-1 rounded-md ${
-                              trans.type === 'profit_payment' ? 'text-success bg-success/10' : 
-                              trans.type === 'investment_add' ? 'text-primary bg-primary/10' : 'text-destructive bg-destructive/10'
-                            }`}>
-                              {formatCurrency(trans.amount)}
-                            </div>
+                  {/* اطلاعات اصلی */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <Card className="relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <CardHeader className="relative z-10 pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-primary/20 rounded-lg blur-sm" />
+                            <User className="relative h-4 w-4 text-primary" />
                           </div>
-                        ))
-                      )}
-                    </div>
+                          اطلاعات شخصی
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="relative z-10 space-y-3">
+                        <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">نام</span>
+                          </div>
+                          <span className="font-semibold">{investor.name}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">شماره تماس</span>
+                          </div>
+                          <span className="font-medium" dir="ltr">{toPersianDigits(investor.phone)}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <IdCard className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">کد ملی</span>
+                          </div>
+                          <span className="font-medium">{toPersianDigits(investor.nationalId)}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">تاریخ شروع</span>
+                          </div>
+                          <span className="font-medium">{toJalaliDate(investor.startDate)}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <CardHeader className="relative z-10 pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-secondary/20 rounded-lg blur-sm" />
+                            <DollarSign className="relative h-4 w-4 text-secondary" />
+                          </div>
+                          اطلاعات مالی
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="relative z-10 space-y-3">
+                        <div className="p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="text-xs text-muted-foreground mb-1">درصد سود</div>
+                          <div className="text-lg font-bold text-primary">{toPersianDigits(investor.profitRate.toString())}%</div>
+                        </div>
+                        <div className="p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
+                          <div className="text-xs text-muted-foreground mb-1">میانگین پرداخت</div>
+                          <div className="text-lg font-bold text-secondary">
+                            {profitTransactions.length > 0 
+                              ? formatCurrency(totalProfitPaid / profitTransactions.length)
+                              : formatCurrency(0)
+                            }
+                          </div>
+                        </div>
+                        <div className="p-3 rounded-lg border border-border/50 bg-gradient-to-br from-success/10 to-primary/10">
+                          <div className="text-xs text-muted-foreground mb-1">کل سود دریافتی</div>
+                          <div className="text-xl font-bold bg-gradient-to-r from-success to-primary bg-clip-text text-transparent">
+                            {formatCurrency(investor.totalProfit)}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
+
+                  {/* تاریخچه تراکنش‌ها */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                        <FileText className="h-4 w-4 text-primary" />
+                        تاریخچه تراکنش‌ها
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {investorTransactions.length === 0 ? (
+                        <div className="text-center py-8">
+                          <div className="relative mb-4 inline-block">
+                            <div className="absolute inset-0 bg-primary/20 rounded-full blur-lg" />
+                            <FileText className="relative h-12 w-12 text-primary mx-auto" />
+                          </div>
+                          <p className="text-sm text-muted-foreground/70">
+                            هنوز تراکنشی ثبت نشده است
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {investorTransactions.map((trans, index) => {
+                            const Icon = trans.type === 'profit_payment' ? ArrowDown : 
+                                        trans.type === 'investment_add' ? ArrowUp : ArrowDown;
+                            const isProfit = trans.type === 'profit_payment';
+                            
+                            return (
+                              <div
+                                key={trans.id}
+                                className={cn(
+                                  "p-4 rounded-lg border transition-all duration-200 hover:scale-[1.01]",
+                                  isProfit 
+                                    ? "bg-success/5 border-success/20 hover:bg-success/10" 
+                                    : trans.type === 'investment_add'
+                                    ? "bg-primary/5 border-primary/20 hover:bg-primary/10"
+                                    : "bg-destructive/5 border-destructive/20 hover:bg-destructive/10"
+                                )}
+                                style={{ animationDelay: `${index * 30}ms` }}
+                              >
+                                <div className="flex items-start justify-between">
+                                  <div className="flex items-start gap-3 flex-1">
+                                    <div className={cn(
+                                      "p-2 rounded-lg",
+                                      isProfit ? "bg-success/10" : 
+                                      trans.type === 'investment_add' ? "bg-primary/10" : "bg-destructive/10"
+                                    )}>
+                                      <Icon className={cn(
+                                        "h-4 w-4",
+                                        isProfit ? "text-success" : 
+                                        trans.type === 'investment_add' ? "text-primary" : "text-destructive"
+                                      )} />
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="font-semibold">
+                                          {trans.type === 'profit_payment' ? 'پرداخت سود' : 
+                                           trans.type === 'investment_add' ? 'افزایش سرمایه' : 'برداشت سرمایه'}
+                                        </span>
+                                        <Badge 
+                                          variant="outline"
+                                          className={cn(
+                                            "text-xs",
+                                            isProfit && "bg-success/10 text-success border-success/20",
+                                            trans.type === 'investment_add' && "bg-primary/10 text-primary border-primary/20",
+                                            trans.type === 'investment_withdraw' && "bg-destructive/10 text-destructive border-destructive/20"
+                                          )}
+                                        >
+                                          {isProfit ? 'پرداخت' : trans.type === 'investment_add' ? 'افزایش' : 'برداشت'}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                                        <Calendar className="h-3 w-3" />
+                                        {toJalaliDate(trans.date)}
+                                      </div>
+                                      {trans.description && (
+                                        <p className="text-xs text-muted-foreground/70 mt-1">
+                                          {trans.description}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-left min-w-[140px]">
+                                    <div className={cn(
+                                      "text-lg font-bold",
+                                      isProfit ? "text-success" : 
+                                      trans.type === 'investment_add' ? "text-primary" : "text-destructive"
+                                    )}>
+                                      {isProfit ? '+' : trans.type === 'investment_add' ? '+' : '-'}
+                                      {formatCurrency(trans.amount)}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
               );
             })()}
           </DialogContent>
         </Dialog>
+
+        {/* AlertDialog حذف سرمایه‌گذار */}
+        <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+          <AlertDialogContent className="max-w-lg p-0 gap-0 overflow-hidden border-destructive/20">
+            {/* Header با gradient */}
+            <div className="relative bg-gradient-to-br from-destructive via-destructive/90 to-destructive/80 p-6">
+              <div className="absolute inset-0 bg-black/10" />
+              <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse" />
+                  <div className="relative p-4 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20">
+                    <Trash2 className="h-10 w-10 text-white" />
+                  </div>
+                </div>
+                <AlertDialogTitle className="text-2xl font-bold text-white">
+                  حذف سرمایه‌گذار
+                </AlertDialogTitle>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 bg-background">
+              <AlertDialogDescription className="text-right space-y-4">
+                <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
+                  <p className="text-base font-semibold text-foreground mb-2">
+                    سرمایه‌گذار مورد نظر:
+                  </p>
+                  <p className="text-lg font-bold text-primary bg-primary/10 px-3 py-2 rounded-md inline-block">
+                    {deleteDialog.investorName}
+                  </p>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-destructive/5 border border-destructive/20">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-full bg-destructive/10 flex-shrink-0">
+                      <AlertCircle className="h-5 w-5 text-destructive" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-semibold text-destructive">
+                        هشدار مهم
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        این عمل غیرقابل بازگشت است و تمام اطلاعات مرتبط با این سرمایه‌گذار از جمله:
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside mr-4">
+                        <li>مبلغ سرمایه‌گذاری</li>
+                        <li>تاریخچه پرداخت سود</li>
+                        <li>اطلاعات مالی</li>
+                      </ul>
+                      <p className="text-sm font-semibold text-destructive mt-2">
+                        برای همیشه حذف خواهند شد.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-center text-sm text-muted-foreground pt-2">
+                  آیا از حذف این سرمایه‌گذار اطمینان دارید؟
+                </p>
+              </AlertDialogDescription>
+            </div>
+
+            {/* Footer */}
+            <AlertDialogFooter className="p-6 pt-0 gap-3 bg-background">
+              <AlertDialogCancel className="flex-1 h-11 text-base font-semibold border-2 hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200">
+                انصراف
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="flex-1 h-11 text-base font-semibold bg-gradient-to-r from-destructive to-destructive/80 hover:from-destructive/90 hover:to-destructive/70 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <Trash2 className="h-4 w-4 ml-2" />
+                حذف سرمایه‌گذار
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

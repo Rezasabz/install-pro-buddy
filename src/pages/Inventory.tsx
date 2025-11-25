@@ -11,6 +11,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,15 +34,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { phonesStore, Phone } from "@/lib/storeProvider";
 import { formatCurrency, toJalaliDate } from "@/lib/persian";
-import { Plus, Edit, Trash2, Smartphone, Package, DollarSign, Palette, HardDrive, Info, ShoppingBag, Calendar, Hash } from "lucide-react";
+import { Plus, Edit, Trash2, Smartphone, Package, DollarSign, Palette, HardDrive, Info, ShoppingBag, Calendar, Hash, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { JalaliDatePicker } from "@/components/JalaliDatePicker";
 import { cn } from "@/lib/utils";
+import { phoneBrands, getModelsByBrand } from "@/lib/phoneModels";
 
 const Inventory = () => {
   const [phones, setPhones] = useState<Phone[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPhone, setEditingPhone] = useState<Phone | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; phoneId: string; phoneInfo: string }>({ open: false, phoneId: '', phoneInfo: '' });
   const [formData, setFormData] = useState({
     brand: "",
     model: "",
@@ -208,23 +220,28 @@ const Inventory = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("آیا از حذف این گوشی اطمینان دارید؟")) {
-      try {
-        await phonesStore.delete(id);
-        toast({
-          title: "موفق",
-          description: "گوشی با موفقیت حذف شد",
-        });
-        loadPhones();
-      } catch (error) {
-        console.error('Error deleting phone:', error);
-        toast({
-          title: "خطا",
-          description: "خطا در حذف گوشی",
-          variant: "destructive",
-        });
-      }
+  const handleDelete = (id: string, phone: Phone) => {
+    const phoneInfo = `${phone.brand} ${phone.model}`;
+    setDeleteDialog({ open: true, phoneId: id, phoneInfo });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await phonesStore.delete(deleteDialog.phoneId);
+      toast({
+        title: "موفق",
+        description: "گوشی با موفقیت حذف شد",
+      });
+      setDeleteDialog({ open: false, phoneId: '', phoneInfo: '' });
+      await loadPhones();
+      refreshPhones();
+    } catch (error) {
+      console.error('Error deleting phone:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در حذف گوشی",
+        variant: "destructive",
+      });
     }
   };
 
@@ -293,32 +310,81 @@ const Inventory = () => {
                         <Hash className="h-4 w-4 text-primary" />
                         برند
                       </Label>
-                      <Input
-                        id="brand"
+                      <Select
                         value={formData.brand}
-                        onChange={(e) =>
-                          setFormData({ ...formData, brand: e.target.value })
-                        }
+                        onValueChange={(value) => {
+                          setFormData({ ...formData, brand: value, model: "" });
+                        }}
                         required
-                        placeholder="مثال: سامسونگ، اپل"
-                        className="h-10"
-                      />
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="انتخاب برند" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {phoneBrands.map((brand) => (
+                            <SelectItem key={brand} value={brand}>
+                              {brand}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="model" className="flex items-center gap-2 text-sm font-medium">
                         <Smartphone className="h-4 w-4 text-primary" />
                         مدل
                       </Label>
-                      <Input
-                        id="model"
-                        value={formData.model}
-                        onChange={(e) =>
-                          setFormData({ ...formData, model: e.target.value })
-                        }
-                        required
-                        placeholder="مثال: Galaxy S24"
-                        className="h-10"
-                      />
+                      {formData.brand ? (
+                        <>
+                          <Select
+                            value={formData.model && getModelsByBrand(formData.brand).includes(formData.model) ? formData.model : "custom"}
+                            onValueChange={(value) => {
+                              if (value === "custom") {
+                                setFormData({ ...formData, model: "" });
+                              } else {
+                                setFormData({ ...formData, model: value });
+                              }
+                            }}
+                            required
+                          >
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="انتخاب مدل" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getModelsByBrand(formData.brand).map((model) => (
+                                <SelectItem key={model} value={model}>
+                                  {model}
+                                </SelectItem>
+                              ))}
+                              <SelectItem value="custom">سایر (ورود دستی)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {(!formData.model || !getModelsByBrand(formData.brand).includes(formData.model)) && (
+                            <Input
+                              id="model"
+                              value={formData.model}
+                              onChange={(e) =>
+                                setFormData({ ...formData, model: e.target.value })
+                              }
+                              required
+                              placeholder="نام مدل را وارد کنید"
+                              className="h-10 mt-2"
+                            />
+                          )}
+                        </>
+                      ) : (
+                        <Input
+                          id="model"
+                          value={formData.model}
+                          onChange={(e) =>
+                            setFormData({ ...formData, model: e.target.value })
+                          }
+                          required
+                          disabled
+                          placeholder="ابتدا برند را انتخاب کنید"
+                          className="h-10"
+                        />
+                      )}
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -691,7 +757,7 @@ const Inventory = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDelete(phone.id)}
+                      onClick={() => handleDelete(phone.id, phone)}
                       className="hover:bg-destructive/10 hover:border-destructive/50 hover:scale-105 transition-all duration-200"
                     >
                       <Trash2 className="h-3 w-3 text-destructive" />
@@ -719,6 +785,83 @@ const Inventory = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* AlertDialog حذف گوشی */}
+        <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+          <AlertDialogContent className="max-w-lg p-0 gap-0 overflow-hidden border-destructive/20">
+            {/* Header با gradient */}
+            <div className="relative bg-gradient-to-br from-destructive via-destructive/90 to-destructive/80 p-6">
+              <div className="absolute inset-0 bg-black/10" />
+              <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse" />
+                  <div className="relative p-4 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20">
+                    <Trash2 className="h-10 w-10 text-white" />
+                  </div>
+                </div>
+                <AlertDialogTitle className="text-2xl font-bold text-white">
+                  حذف گوشی
+                </AlertDialogTitle>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 bg-background">
+              <AlertDialogDescription className="text-right space-y-4">
+                <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
+                  <p className="text-base font-semibold text-foreground mb-2">
+                    گوشی مورد نظر:
+                  </p>
+                  <p className="text-lg font-bold text-primary bg-primary/10 px-3 py-2 rounded-md inline-block">
+                    {deleteDialog.phoneInfo}
+                  </p>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-destructive/5 border border-destructive/20">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-full bg-destructive/10 flex-shrink-0">
+                      <AlertCircle className="h-5 w-5 text-destructive" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-semibold text-destructive">
+                        هشدار مهم
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        این عمل غیرقابل بازگشت است و تمام اطلاعات مرتبط با این گوشی از جمله:
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside mr-4">
+                        <li>اطلاعات خرید و فروش</li>
+                        <li>IMEI و مشخصات فنی</li>
+                        <li>تاریخچه موجودی</li>
+                      </ul>
+                      <p className="text-sm font-semibold text-destructive mt-2">
+                        برای همیشه حذف خواهند شد.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-center text-sm text-muted-foreground pt-2">
+                  آیا از حذف این گوشی اطمینان دارید؟
+                </p>
+              </AlertDialogDescription>
+            </div>
+
+            {/* Footer */}
+            <AlertDialogFooter className="p-6 pt-0 gap-3 bg-background">
+              <AlertDialogCancel className="flex-1 h-11 text-base font-semibold border-2 hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200">
+                انصراف
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="flex-1 h-11 text-base font-semibold bg-gradient-to-r from-destructive to-destructive/80 hover:from-destructive/90 hover:to-destructive/70 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <Trash2 className="h-4 w-4 ml-2" />
+                حذف گوشی
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

@@ -11,6 +11,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,7 +33,7 @@ import {
 } from "@/components/ui/select";
 import { expensesStore, Expense } from "@/lib/storeProvider";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
-import { Plus, Edit, Trash2, Receipt, TrendingDown, Calendar, Filter } from "lucide-react";
+import { Plus, Edit, Trash2, Receipt, TrendingDown, Calendar, Filter, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { JalaliDatePicker } from "@/components/JalaliDatePicker";
 import { cn } from "@/lib/utils";
@@ -47,6 +57,7 @@ export default function Expenses() {
   const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; expenseId: string; expenseInfo: string }>({ open: false, expenseId: '', expenseInfo: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [expenseDate, setExpenseDate] = useState<Date>(new Date());
@@ -195,17 +206,19 @@ export default function Expenses() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("آیا از حذف این هزینه اطمینان دارید؟")) {
-      return;
-    }
+  const handleDelete = (id: string, expense: Expense) => {
+    const expenseInfo = `${expense.type} - ${formatCurrency(expense.amount)}`;
+    setDeleteDialog({ open: true, expenseId: id, expenseInfo });
+  };
 
+  const confirmDelete = async () => {
     try {
-      await expensesStore.delete(id);
+      await expensesStore.delete(deleteDialog.expenseId);
       toast({
         title: "موفق",
         description: "هزینه با موفقیت حذف شد",
       });
+      setDeleteDialog({ open: false, expenseId: '', expenseInfo: '' });
       await loadExpenses();
       refreshDashboard();
     } catch (error) {
@@ -480,7 +493,7 @@ export default function Expenses() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDelete(expense.id)}
+                          onClick={() => handleDelete(expense.id, expense)}
                           className="hover:bg-destructive/10 hover:border-destructive/50 hover:scale-110 transition-all duration-200"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -493,6 +506,74 @@ export default function Expenses() {
             ))
           )}
         </div>
+        {/* AlertDialog حذف هزینه */}
+        <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+          <AlertDialogContent className="max-w-lg p-0 gap-0 overflow-hidden border-destructive/20">
+            {/* Header با gradient */}
+            <div className="relative bg-gradient-to-br from-destructive via-destructive/90 to-destructive/80 p-6">
+              <div className="absolute inset-0 bg-black/10" />
+              <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse" />
+                  <div className="relative p-4 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20">
+                    <Trash2 className="h-10 w-10 text-white" />
+                  </div>
+                </div>
+                <AlertDialogTitle className="text-2xl font-bold text-white">
+                  حذف هزینه
+                </AlertDialogTitle>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 bg-background">
+              <AlertDialogDescription className="text-right space-y-4">
+                <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
+                  <p className="text-base font-semibold text-foreground mb-2">
+                    هزینه مورد نظر:
+                  </p>
+                  <p className="text-lg font-bold text-primary bg-primary/10 px-3 py-2 rounded-md inline-block">
+                    {deleteDialog.expenseInfo}
+                  </p>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-destructive/5 border border-destructive/20">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-full bg-destructive/10 flex-shrink-0">
+                      <AlertCircle className="h-5 w-5 text-destructive" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-semibold text-destructive">
+                        هشدار
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        این عمل غیرقابل بازگشت است و این هزینه از گزارش‌های مالی حذف خواهد شد.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-center text-sm text-muted-foreground pt-2">
+                  آیا از حذف این هزینه اطمینان دارید؟
+                </p>
+              </AlertDialogDescription>
+            </div>
+
+            {/* Footer */}
+            <AlertDialogFooter className="p-6 pt-0 gap-3 bg-background">
+              <AlertDialogCancel className="flex-1 h-11 text-base font-semibold border-2 hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200">
+                انصراف
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="flex-1 h-11 text-base font-semibold bg-gradient-to-r from-destructive to-destructive/80 hover:from-destructive/90 hover:to-destructive/70 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <Trash2 className="h-4 w-4 ml-2" />
+                حذف هزینه
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
