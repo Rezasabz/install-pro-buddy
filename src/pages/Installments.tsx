@@ -13,6 +13,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -34,6 +44,7 @@ import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
 import { addCapitalFromPayment, addMonthlyProfitToPartners } from "@/lib/profitCalculator";
 import { DollarSign, CheckCircle, Clock, AlertCircle, Trash2, Search, Filter, FileText, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const Installments = () => {
   const [installments, setInstallments] = useState<Installment[]>([]);
@@ -46,6 +57,8 @@ const Installments = () => {
   const [selectedSaleId, setSelectedSaleId] = useState<string>("");
   const [saleDetailsDialog, setSaleDetailsDialog] = useState<{ open: boolean; saleId: string }>({ open: false, saleId: '' });
   const [bulkPaymentDialog, setBulkPaymentDialog] = useState<{ open: boolean; saleId: string }>({ open: false, saleId: '' });
+  const [cancelPaymentDialog, setCancelPaymentDialog] = useState<{ open: boolean; installmentId: string; installmentInfo: string }>({ open: false, installmentId: '', installmentInfo: '' });
+  const [bulkPaymentConfirmDialog, setBulkPaymentConfirmDialog] = useState<{ open: boolean; saleId: string; installmentsCount: number; totalAmount: number; totalPrincipal: number; totalInterest: number }>({ open: false, saleId: '', installmentsCount: 0, totalAmount: 0, totalPrincipal: 0, totalInterest: 0 });
   const [selectedInstallments, setSelectedInstallments] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { refreshPartners, refreshDashboard } = useDataContext();
@@ -192,17 +205,23 @@ const Installments = () => {
     }
   };
 
-  const handleCancelPayment = async (installmentId: string) => {
+  const handleCancelPayment = (installmentId: string) => {
     const installment = installments.find(i => i.id === installmentId);
     if (!installment || installment.status !== 'paid') return;
 
-    if (!confirm("⚠️ آیا از لغو این پرداخت اطمینان دارید؟\n\nسرمایه و سود به حالت قبل برمی‌گردند.")) {
-      return;
-    }
+    const sale = sales.find(s => s.id === installment.saleId);
+    const customer = customers.find(c => c.id === sale?.customerId);
+    const installmentInfo = `قسط ${toPersianDigits(installment.installmentNumber)} - ${customer?.name || 'نامشخص'}`;
+    setCancelPaymentDialog({ open: true, installmentId, installmentInfo });
+  };
 
+  const confirmCancelPayment = async () => {
     try {
+      const installment = installments.find(i => i.id === cancelPaymentDialog.installmentId);
+      if (!installment) return;
+
       // لغو پرداخت
-      await installmentsStore.update(installmentId, {
+      await installmentsStore.update(cancelPaymentDialog.installmentId, {
         status: 'pending',
         paidDate: undefined,
       });
@@ -277,9 +296,20 @@ const Installments = () => {
     const totalPrincipal = installmentsToPayArray.reduce((sum, i) => sum + i.principalAmount, 0);
     const totalInterest = installmentsToPayArray.reduce((sum, i) => sum + i.interestAmount, 0);
 
-    if (!confirm(`پرداخت ${toPersianDigits(installmentsToPayArray.length)} قسط\n\nمجموع: ${formatCurrency(totalAmount)}\nاصل: ${formatCurrency(totalPrincipal)}\nسود: ${formatCurrency(totalInterest)}\n\nآیا مطمئن هستید؟`)) {
-      return;
-    }
+    setBulkPaymentConfirmDialog({
+      open: true,
+      saleId: bulkPaymentDialog.saleId,
+      installmentsCount: installmentsToPayArray.length,
+      totalAmount,
+      totalPrincipal,
+      totalInterest,
+    });
+  };
+
+  const confirmBulkPayment = async () => {
+    const installmentsToPayArray = Array.from(selectedInstallments)
+      .map(id => installments.find(i => i.id === id))
+      .filter(i => i && i.status !== 'paid') as Installment[];
 
     installmentsToPayArray.forEach(installment => {
       handlePayment(installment.id);
@@ -287,6 +317,7 @@ const Installments = () => {
 
     setSelectedInstallments(new Set());
     setBulkPaymentDialog({ open: false, saleId: '' });
+    setBulkPaymentConfirmDialog({ open: false, saleId: '', installmentsCount: 0, totalAmount: 0, totalPrincipal: 0, totalInterest: 0 });
 
     toast({
       title: "موفق",
@@ -342,56 +373,72 @@ const Installments = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold">مدیریت اقساط</h1>
-            <p className="text-muted-foreground">
+      <div className="space-y-6 animate-fade-scale">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-2">
+          <div className="space-y-1">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
+              مدیریت اقساط
+            </h1>
+            <p className="text-muted-foreground/80 text-sm md:text-base">
               پیگیری و ثبت پرداخت اقساط مشتریان (سود ۴٪ ماهانه)
             </p>
           </div>
         </div>
 
         {/* فیلترها و جستجو */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <Label htmlFor="search" className="flex items-center gap-2 mb-2">
-                  <Search className="h-4 w-4" />
+        <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-lg transition-shadow duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
+          <CardHeader className="relative z-10 pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-primary to-secondary" />
+              فیلترها و جستجو
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="relative z-10">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-2">
+                <Label htmlFor="search" className="flex items-center gap-2 text-sm font-semibold">
+                  <div className="p-1.5 rounded-md bg-primary/10">
+                    <Search className="h-3.5 w-3.5 text-primary" />
+                  </div>
                   جستجوی مشتری
                 </Label>
                 <Input
                   id="search"
-                  placeholder="نام مشتری..."
+                  placeholder="نام مشتری را وارد کنید..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
                 />
               </div>
-              <div>
-                <Label htmlFor="status" className="flex items-center gap-2 mb-2">
-                  <Filter className="h-4 w-4" />
-                  وضعیت
+              <div className="space-y-2">
+                <Label htmlFor="status" className="flex items-center gap-2 text-sm font-semibold">
+                  <div className="p-1.5 rounded-md bg-secondary/10">
+                    <Filter className="h-3.5 w-3.5 text-secondary" />
+                  </div>
+                  وضعیت قسط
                 </Label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger id="status">
-                    <SelectValue />
+                  <SelectTrigger id="status" className="h-10">
+                    <SelectValue placeholder="انتخاب وضعیت" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">همه</SelectItem>
-                    <SelectItem value="pending">در انتظار</SelectItem>
+                    <SelectItem value="all">همه وضعیت‌ها</SelectItem>
+                    <SelectItem value="pending">در انتظار پرداخت</SelectItem>
                     <SelectItem value="overdue">معوق</SelectItem>
                     <SelectItem value="paid">پرداخت شده</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="sale" className="flex items-center gap-2 mb-2">
-                  <FileText className="h-4 w-4" />
+              <div className="space-y-2">
+                <Label htmlFor="sale" className="flex items-center gap-2 text-sm font-semibold">
+                  <div className="p-1.5 rounded-md bg-secondary/10">
+                    <FileText className="h-3.5 w-3.5 text-secondary" />
+                  </div>
                   فروش خاص
                 </Label>
                 <Select value={selectedSaleId || "all_sales"} onValueChange={(value) => setSelectedSaleId(value === "all_sales" ? "" : value)}>
-                  <SelectTrigger id="sale">
+                  <SelectTrigger id="sale" className="h-10">
                     <SelectValue placeholder="همه فروش‌ها" />
                   </SelectTrigger>
                   <SelectContent>
@@ -415,8 +462,9 @@ const Installments = () => {
                     setStatusFilter("all");
                     setSelectedSaleId("");
                   }}
-                  className="w-full"
+                  className="w-full h-10 gap-2 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50 hover:scale-105 transition-all duration-200"
                 >
+                  <Filter className="h-4 w-4 rotate-180" />
                   پاک کردن فیلترها
                 </Button>
               </div>
@@ -441,66 +489,79 @@ const Installments = () => {
 
               return (
                 <div className="space-y-4 overflow-y-auto pl-2">
-                  <div className="grid grid-cols-2 gap-3 p-3 bg-muted rounded-lg text-sm">
-                    <div>
-                      <div className="text-xs text-muted-foreground">مشتری</div>
-                      <div className="font-semibold">{customer?.name}</div>
+                  <div className="grid grid-cols-2 gap-3 p-4 bg-gradient-to-br from-muted/50 to-muted/30 rounded-xl border border-border/50">
+                    <div className="p-2 rounded-lg hover:bg-accent/30 transition-colors duration-200">
+                      <div className="text-xs text-muted-foreground/70 mb-1">مشتری</div>
+                      <div className="font-bold text-base">{customer?.name}</div>
                     </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">گوشی</div>
-                      <div className="font-semibold text-sm">{phone?.brand} {phone?.model}</div>
+                    <div className="p-2 rounded-lg hover:bg-accent/30 transition-colors duration-200">
+                      <div className="text-xs text-muted-foreground/70 mb-1">گوشی</div>
+                      <div className="font-bold text-base">{phone?.brand} {phone?.model}</div>
                     </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">قیمت اعلامی</div>
-                      <div className="font-semibold">{formatCurrency(sale.announcedPrice)}</div>
+                    <div className="p-2 rounded-lg hover:bg-primary/10 transition-colors duration-200">
+                      <div className="text-xs text-muted-foreground/70 mb-1">قیمت اعلامی</div>
+                      <div className="font-bold text-base text-primary">{formatCurrency(sale.announcedPrice)}</div>
                     </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">پیش‌پرداخت</div>
-                      <div className="font-semibold">{formatCurrency(sale.downPayment)}</div>
+                    <div className="p-2 rounded-lg hover:bg-accent/30 transition-colors duration-200">
+                      <div className="text-xs text-muted-foreground/70 mb-1">پیش‌پرداخت</div>
+                      <div className="font-bold text-base">{formatCurrency(sale.downPayment)}</div>
                     </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">تعداد اقساط</div>
-                      <div className="font-semibold">{toPersianDigits(sale.installmentMonths)} ماه</div>
+                    <div className="p-2 rounded-lg hover:bg-secondary/10 transition-colors duration-200">
+                      <div className="text-xs text-muted-foreground/70 mb-1">تعداد اقساط</div>
+                      <div className="font-bold text-base text-secondary">{toPersianDigits(sale.installmentMonths)} ماه</div>
                     </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">پیشرفت</div>
-                      <div className="font-semibold">
+                    <div className="p-2 rounded-lg hover:bg-success/10 transition-colors duration-200">
+                      <div className="text-xs text-muted-foreground/70 mb-1">پیشرفت</div>
+                      <div className="font-bold text-base text-success">
                         {toPersianDigits(paidCount)} از {toPersianDigits(saleInstallments.length)} قسط
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-semibold text-sm">لیست اقساط</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center pb-2 border-b border-border/50">
+                      <h3 className="font-bold text-base flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-primary to-secondary" />
+                        لیست اقساط
+                      </h3>
                       <Button
                         size="sm"
                         onClick={() => {
                           setBulkPaymentDialog({ open: true, saleId: sale.id });
                           setSaleDetailsDialog({ open: false, saleId: '' });
                         }}
+                        className="gap-2 hover:scale-105 transition-all duration-200"
                       >
-                        <CreditCard className="h-3 w-3 ml-1" />
+                        <CreditCard className="h-3.5 w-3.5" />
                         پرداخت چند قسط
                       </Button>
                     </div>
                     <div className="space-y-2 max-h-[40vh] overflow-y-auto pl-1">
-                      {saleInstallments.map(inst => (
-                        <div key={inst.id} className="p-2 border rounded-lg hover:bg-muted/50 transition-colors">
+                      {saleInstallments.map((inst, index) => (
+                        <div 
+                          key={inst.id} 
+                          className="p-3 border border-border/50 rounded-lg hover:bg-accent/30 hover:border-primary/30 transition-all duration-200 hover:scale-[1.01] animate-slide-in"
+                          style={{ animationDelay: `${index * 30}ms` }}
+                        >
                           <div className="flex justify-between items-center gap-2">
                             <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-sm">
+                              <div className="font-bold text-sm">
                                 قسط {toPersianDigits(inst.installmentNumber)}
                               </div>
-                              <div className="text-xs text-muted-foreground truncate">
+                              <div className="text-xs text-muted-foreground/70 truncate mt-0.5">
                                 {toJalaliDate(inst.dueDate)}
                               </div>
                             </div>
                             <div className="text-left">
-                              <div className="font-bold text-sm">{formatCurrency(inst.totalAmount)}</div>
+                              <div className="font-bold text-sm text-primary">{formatCurrency(inst.totalAmount)}</div>
                               <Badge 
                                 variant={inst.status === 'paid' ? 'default' : inst.status === 'overdue' ? 'destructive' : 'secondary'}
-                                className="text-xs"
+                                className={cn(
+                                  "text-xs mt-1",
+                                  inst.status === 'paid' && "bg-success/10 text-success border-success/20",
+                                  inst.status === 'overdue' && "bg-destructive/10 text-destructive border-destructive/20",
+                                  inst.status === 'pending' && "bg-warning/10 text-warning border-warning/20"
+                                )}
                               >
                                 {inst.status === 'paid' ? 'پرداخت' : inst.status === 'overdue' ? 'معوق' : 'انتظار'}
                               </Badge>
@@ -538,45 +599,52 @@ const Installments = () => {
               const totalSelected = selectedArray.reduce((sum, i) => sum + i.totalAmount, 0);
 
               return (
-                <div className="space-y-3 overflow-y-auto pl-2">
-                  <div className="p-3 bg-muted rounded-lg">
-                    <div className="font-semibold text-sm">{customer?.name}</div>
-                    <div className="text-xs text-muted-foreground">
+                <div className="space-y-4 overflow-y-auto pl-2">
+                  <div className="p-4 bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10 rounded-xl border border-primary/20">
+                    <div className="font-bold text-base mb-1">{customer?.name}</div>
+                    <div className="text-sm text-muted-foreground/70">
                       {toPersianDigits(saleInstallments.length)} قسط باقی‌مانده
                     </div>
                   </div>
 
                   <div className="space-y-2 max-h-[45vh] overflow-y-auto pl-1">
-                    {saleInstallments.map(inst => (
+                    {saleInstallments.map((inst, index) => (
                       <div
                         key={inst.id}
-                        className={`p-2 border rounded-lg cursor-pointer transition-colors ${
-                          selectedInstallments.has(inst.id) ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
-                        }`}
+                        className={cn(
+                          "p-3 border border-border/50 rounded-lg cursor-pointer transition-all duration-200 hover:scale-[1.01] animate-slide-in",
+                          selectedInstallments.has(inst.id) 
+                            ? 'bg-primary/10 border-primary/50 shadow-sm' 
+                            : 'hover:bg-accent/30 hover:border-primary/30'
+                        )}
                         onClick={() => toggleInstallmentSelection(inst.id)}
+                        style={{ animationDelay: `${index * 30}ms` }}
                       >
-                        <div className="flex justify-between items-center gap-2">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="flex justify-between items-center gap-3">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
                             <input
                               type="checkbox"
                               checked={selectedInstallments.has(inst.id)}
                               onChange={() => toggleInstallmentSelection(inst.id)}
-                              className="h-3 w-3"
+                              className="h-4 w-4 rounded border-2 border-primary/30 checked:bg-primary checked:border-primary cursor-pointer transition-all duration-200"
                               onClick={(e) => e.stopPropagation()}
                             />
                             <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-sm">
+                              <div className="font-bold text-sm mb-0.5">
                                 قسط {toPersianDigits(inst.installmentNumber)}
                               </div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {toJalaliDate(inst.dueDate)}
+                              <div className="text-xs text-muted-foreground/70 truncate">
+                                سررسید: {toJalaliDate(inst.dueDate)}
                               </div>
                             </div>
                           </div>
-                          <div className="text-left">
-                            <div className="font-bold text-sm">{formatCurrency(inst.totalAmount)}</div>
-                            <div className="text-xs text-muted-foreground whitespace-nowrap">
-                              اصل: {formatCurrency(inst.principalAmount)}
+                          <div className="text-left space-y-0.5 min-w-[120px]">
+                            <div className="font-bold text-base text-primary">{formatCurrency(inst.totalAmount)}</div>
+                            <div className="text-xs text-muted-foreground/70 whitespace-nowrap">
+                              اصل: <span className="font-medium">{formatCurrency(inst.principalAmount)}</span>
+                            </div>
+                            <div className="text-xs text-secondary whitespace-nowrap">
+                              سود: <span className="font-medium">{formatCurrency(inst.interestAmount)}</span>
                             </div>
                           </div>
                         </div>
@@ -585,42 +653,44 @@ const Installments = () => {
                   </div>
 
                   {selectedArray.length > 0 && (
-                    <div className="p-3 bg-primary/10 rounded-lg">
-                      <div className="flex justify-between items-center mb-1 text-sm">
-                        <span className="font-semibold">تعداد:</span>
-                        <span>{toPersianDigits(selectedArray.length)} قسط</span>
+                    <div className="p-4 bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10 rounded-xl border border-primary/20">
+                      <div className="flex justify-between items-center mb-2 text-sm">
+                        <span className="font-semibold text-muted-foreground/70">تعداد انتخاب شده:</span>
+                        <span className="font-bold text-primary">{toPersianDigits(selectedArray.length)} قسط</span>
                       </div>
-                      <div className="flex justify-between items-center text-base font-bold">
-                        <span>مجموع:</span>
-                        <span>{formatCurrency(totalSelected)}</span>
+                      <div className="flex justify-between items-center pt-2 border-t border-primary/20">
+                        <span className="font-bold text-base">مجموع مبلغ:</span>
+                        <span className="text-lg font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                          {formatCurrency(totalSelected)}
+                        </span>
                       </div>
                     </div>
                   )}
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 pt-2">
                     <Button
                       variant="outline"
                       onClick={() => {
                         const allIds = new Set(saleInstallments.map(i => i.id));
                         setSelectedInstallments(allIds);
                       }}
-                      className="flex-1"
+                      className="flex-1 gap-2 hover:bg-primary/10 hover:border-primary/50 hover:scale-105 transition-all duration-200"
                     >
                       انتخاب همه
                     </Button>
                     <Button
                       variant="outline"
                       onClick={() => setSelectedInstallments(new Set())}
-                      className="flex-1"
+                      className="flex-1 gap-2 hover:bg-destructive/10 hover:border-destructive/50 hover:scale-105 transition-all duration-200"
                     >
                       پاک کردن
                     </Button>
                     <Button
                       onClick={handleBulkPayment}
                       disabled={selectedInstallments.size === 0}
-                      className="flex-1"
+                      className="flex-1 gap-2 hover:scale-105 transition-all duration-200 disabled:opacity-50"
                     >
-                      <DollarSign className="h-4 w-4 ml-2" />
+                      <DollarSign className="h-4 w-4" />
                       پرداخت
                     </Button>
                   </div>
@@ -631,52 +701,64 @@ const Installments = () => {
         </Dialog>
 
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
               <CardTitle className="flex items-center gap-2 text-base">
-                <Clock className="h-5 w-5 text-info" />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <Clock className="relative h-5 w-5 text-primary" />
+                </div>
                 در انتظار پرداخت
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                 {formatCurrency(totalPending)}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground/70 mt-2">
                 {toPersianDigits(pendingInstallments.length)} قسط
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-warning/5 via-transparent to-warning/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
               <CardTitle className="flex items-center gap-2 text-base">
-                <AlertCircle className="h-5 w-5 text-warning" />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-warning/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <AlertCircle className="relative h-5 w-5 text-warning" />
+                </div>
                 معوق
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-warning">
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold bg-gradient-to-r from-warning to-warning/80 bg-clip-text text-transparent">
                 {formatCurrency(totalOverdue)}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground/70 mt-2">
                 {toPersianDigits(overdueInstallments.length)} قسط
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group">
+            <div className="absolute inset-0 bg-gradient-to-br from-success/5 via-transparent to-success/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="relative z-10">
               <CardTitle className="flex items-center gap-2 text-base">
-                <CheckCircle className="h-5 w-5 text-success" />
+                <div className="relative">
+                  <div className="absolute inset-0 bg-success/20 rounded-lg blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <CheckCircle className="relative h-5 w-5 text-success" />
+                </div>
                 پرداخت شده
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-success">
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold bg-gradient-to-r from-success to-success/80 bg-clip-text text-transparent">
                 {formatCurrency(totalPaid)}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground/70 mt-2">
                 {toPersianDigits(paidInstallments.length)} قسط
               </p>
             </CardContent>
@@ -695,20 +777,28 @@ const Installments = () => {
             const unpaidInstallments = saleInstallments.filter(i => i.status !== 'paid');
 
             return (
-              <Card key={saleId} className="overflow-hidden">
-                <CardHeader className="bg-muted/50">
+              <Card key={saleId} className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.01] transition-all duration-300 group">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <CardHeader className="bg-gradient-to-r from-muted/50 to-muted/30 relative z-10">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <CardTitle className="flex items-center gap-2">
+                      <CardTitle className="flex items-center gap-2 font-bold">
                         {customer?.name}
-                        <Badge variant={sale.status === 'completed' ? 'default' : sale.status === 'defaulted' ? 'destructive' : 'secondary'}>
+                        <Badge 
+                          variant={sale.status === 'completed' ? 'default' : sale.status === 'defaulted' ? 'destructive' : 'secondary'}
+                          className={cn(
+                            sale.status === 'completed' && "bg-success/10 text-success border-success/20",
+                            sale.status === 'defaulted' && "bg-destructive/10 text-destructive border-destructive/20",
+                            sale.status === 'active' && "bg-primary/10 text-primary border-primary/20"
+                          )}
+                        >
                           {sale.status === 'completed' ? 'تکمیل شده' : sale.status === 'defaulted' ? 'نکول' : 'فعال'}
                         </Badge>
                       </CardTitle>
-                      <div className="text-sm text-muted-foreground mt-1">
+                      <div className="text-sm text-muted-foreground/70 mt-1">
                         {phone?.brand} {phone?.model} - {formatCurrency(sale.announcedPrice)}
                       </div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-muted-foreground/70">
                         پیشرفت: {toPersianDigits(paidCount)} از {toPersianDigits(saleInstallments.length)} قسط
                       </div>
                     </div>
@@ -717,8 +807,9 @@ const Installments = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => setSaleDetailsDialog({ open: true, saleId })}
+                        className="gap-2 hover:bg-primary/10 hover:border-primary/50 hover:scale-105 transition-all duration-200"
                       >
-                        <FileText className="h-4 w-4 ml-2" />
+                        <FileText className="h-4 w-4" />
                         جزئیات
                       </Button>
                       {unpaidInstallments.length > 0 && (
@@ -728,24 +819,26 @@ const Installments = () => {
                             setBulkPaymentDialog({ open: true, saleId });
                             setSelectedInstallments(new Set());
                           }}
+                          className="gap-2 hover:scale-105 transition-all duration-200"
                         >
-                          <CreditCard className="h-4 w-4 ml-2" />
+                          <CreditCard className="h-4 w-4" />
                           پرداخت چند قسط
                         </Button>
                       )}
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-4">
+                <CardContent className="pt-4 relative z-10">
                   <div className="space-y-3">
-                    {saleInstallments.map((installment) => (
+                    {saleInstallments.map((installment, index) => (
                       <div
                         key={installment.id}
-                        className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                        className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border border-border/50 hover:bg-accent/30 hover:border-primary/30 transition-all duration-200 hover:scale-[1.01] animate-slide-in bg-card/50"
+                        style={{ animationDelay: `${index * 30}ms` }}
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-bold text-base">
                               قسط {toPersianDigits(installment.installmentNumber)}
                             </span>
                             <Badge
@@ -753,37 +846,46 @@ const Installments = () => {
                                 installment.status === 'paid' ? 'default' :
                                 installment.status === 'overdue' ? 'destructive' : 'secondary'
                               }
-                              className="text-xs"
+                              className={cn(
+                                "text-xs px-2 py-0.5",
+                                installment.status === 'paid' && "bg-success/10 text-success border-success/20",
+                                installment.status === 'overdue' && "bg-destructive/10 text-destructive border-destructive/20",
+                                installment.status === 'pending' && "bg-warning/10 text-warning border-warning/20"
+                              )}
                             >
                               {installment.status === 'paid' ? 'پرداخت شده' :
                                installment.status === 'overdue' ? 'معوق' : 'در انتظار'}
                             </Badge>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            سررسید: {toJalaliDate(installment.dueDate)}
-                            {installment.paidDate && ` • پرداخت: ${toJalaliDate(installment.paidDate)}`}
+                          <div className="text-sm text-muted-foreground/70 space-y-0.5">
+                            <div>سررسید: <span className="font-medium text-foreground">{toJalaliDate(installment.dueDate)}</span></div>
+                            {installment.paidDate && (
+                              <div className="text-xs text-success">پرداخت: {toJalaliDate(installment.paidDate)}</div>
+                            )}
                           </div>
                         </div>
 
-                        <div className="flex flex-col md:items-end gap-1">
-                          <div className="text-sm text-muted-foreground">
-                            اصل: {formatCurrency(installment.principalAmount)} + سود: {formatCurrency(installment.interestAmount)}
+                        <div className="flex flex-col md:items-end gap-2 min-w-[140px]">
+                          <div className="text-xs text-muted-foreground/70 space-y-0.5">
+                            <div>اصل: <span className="font-medium text-foreground">{formatCurrency(installment.principalAmount)}</span></div>
+                            <div>سود: <span className="font-medium text-secondary">{formatCurrency(installment.interestAmount)}</span></div>
                           </div>
-                          <div className="text-lg font-bold">
+                          <div className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                             {formatCurrency(installment.totalAmount)}
                           </div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-muted-foreground/60">
                             مانده: {formatCurrency(installment.remainingDebt)}
                           </div>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 min-w-[100px]">
                           {installment.status !== 'paid' ? (
                             <Button
                               onClick={() => handlePayment(installment.id)}
+                              className="gap-2 hover:scale-105 transition-all duration-200 flex-1"
                               size="sm"
                             >
-                              <DollarSign className="ml-2 h-4 w-4" />
+                              <DollarSign className="h-4 w-4" />
                               پرداخت
                             </Button>
                           ) : (
@@ -791,8 +893,9 @@ const Installments = () => {
                               variant="outline"
                               size="sm"
                               onClick={() => handleCancelPayment(installment.id)}
+                              className="gap-2 hover:bg-destructive/10 hover:border-destructive/50 hover:scale-105 transition-all duration-200 flex-1"
                             >
-                              <Trash2 className="ml-2 h-4 w-4" />
+                              <Trash2 className="h-4 w-4 text-destructive" />
                               لغو
                             </Button>
                           )}
@@ -831,9 +934,165 @@ const Installments = () => {
             </CardContent>
           </Card>
         )}
+        {/* AlertDialog لغو پرداخت */}
+        <AlertDialog open={cancelPaymentDialog.open} onOpenChange={(open) => setCancelPaymentDialog({ ...cancelPaymentDialog, open })}>
+          <AlertDialogContent className="max-w-lg p-0 gap-0 overflow-hidden border-warning/20">
+            {/* Header با gradient */}
+            <div className="relative bg-gradient-to-br from-warning via-warning/90 to-warning/80 p-6">
+              <div className="absolute inset-0 bg-black/10" />
+              <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse" />
+                  <div className="relative p-4 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20">
+                    <AlertCircle className="h-10 w-10 text-white" />
+                  </div>
+                </div>
+                <AlertDialogTitle className="text-2xl font-bold text-white">
+                  لغو پرداخت
+                </AlertDialogTitle>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 bg-background">
+              <AlertDialogDescription className="text-right space-y-4">
+                <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
+                  <p className="text-base font-semibold text-foreground mb-2">
+                    قسط مورد نظر:
+                  </p>
+                  <p className="text-lg font-bold text-primary bg-primary/10 px-3 py-2 rounded-md inline-block">
+                    {cancelPaymentDialog.installmentInfo}
+                  </p>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-warning/10 border border-warning/30">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-full bg-warning/20 flex-shrink-0">
+                      <AlertCircle className="h-5 w-5 text-warning" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-semibold text-warning">
+                        هشدار مهم
+                      </p>
+                      <p className="text-sm text-foreground leading-relaxed">
+                        با لغو این پرداخت، موارد زیر به حالت قبل برمی‌گردند:
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside mr-4">
+                        <li>سرمایه از حساب شرکا کسر می‌شود</li>
+                        <li>سود ماهانه از حساب شرکا کسر می‌شود</li>
+                        <li>وضعیت فروش به "فعال" تغییر می‌کند</li>
+                      </ul>
+                      <p className="text-sm font-semibold text-warning mt-2">
+                        این عمل قابل بازگشت است اما تغییرات مالی اعمال می‌شود.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-center text-sm text-muted-foreground pt-2">
+                  آیا از لغو این پرداخت اطمینان دارید؟
+                </p>
+              </AlertDialogDescription>
+            </div>
+
+            {/* Footer */}
+            <AlertDialogFooter className="p-6 pt-0 gap-3 bg-background">
+              <AlertDialogCancel className="flex-1 h-11 text-base font-semibold border-2 hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200">
+                انصراف
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmCancelPayment}
+                className="flex-1 h-11 text-base font-semibold bg-gradient-to-r from-warning to-warning/80 hover:from-warning/90 hover:to-warning/70 text-warning-foreground shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <AlertCircle className="h-4 w-4 ml-2" />
+                لغو پرداخت
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* AlertDialog تایید پرداخت دسته‌ای */}
+        <AlertDialog open={bulkPaymentConfirmDialog.open} onOpenChange={(open) => setBulkPaymentConfirmDialog({ ...bulkPaymentConfirmDialog, open })}>
+          <AlertDialogContent className="max-w-lg p-0 gap-0 overflow-hidden border-success/20">
+            {/* Header با gradient */}
+            <div className="relative bg-gradient-to-br from-success via-success/90 to-success/80 p-6">
+              <div className="absolute inset-0 bg-black/10" />
+              <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse" />
+                  <div className="relative p-4 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20">
+                    <CheckCircle className="h-10 w-10 text-white" />
+                  </div>
+                </div>
+                <AlertDialogTitle className="text-2xl font-bold text-white">
+                  تایید پرداخت دسته‌ای
+                </AlertDialogTitle>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 bg-background">
+              <AlertDialogDescription className="text-right space-y-4">
+                <div className="p-4 rounded-lg bg-success/5 border border-success/20 space-y-3">
+                  <div className="flex justify-between items-center pb-2 border-b border-border/50">
+                    <span className="text-sm font-semibold text-muted-foreground">تعداد اقساط:</span>
+                    <span className="text-lg font-bold text-foreground">{toPersianDigits(bulkPaymentConfirmDialog.installmentsCount)} قسط</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">اصل:</span>
+                    <span className="font-semibold text-primary text-base">{formatCurrency(bulkPaymentConfirmDialog.totalPrincipal)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">سود:</span>
+                    <span className="font-semibold text-secondary text-base">{formatCurrency(bulkPaymentConfirmDialog.totalInterest)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t border-border/50">
+                    <span className="text-base font-bold text-foreground">مجموع:</span>
+                    <span className="text-xl font-bold text-success">{formatCurrency(bulkPaymentConfirmDialog.totalAmount)}</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-success/5 border border-success/20">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-full bg-success/10 flex-shrink-0">
+                      <CheckCircle className="h-5 w-5 text-success" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <p className="text-sm font-semibold text-success">
+                        اطلاعات پرداخت
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        با تایید این پرداخت، سرمایه و سود به حساب شرکا اضافه خواهد شد.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-center text-sm text-muted-foreground pt-2">
+                  آیا از پرداخت این اقساط اطمینان دارید؟
+                </p>
+              </AlertDialogDescription>
+            </div>
+
+            {/* Footer */}
+            <AlertDialogFooter className="p-6 pt-0 gap-3 bg-background">
+              <AlertDialogCancel className="flex-1 h-11 text-base font-semibold border-2 hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200">
+                انصراف
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmBulkPayment}
+                className="flex-1 h-11 text-base font-semibold bg-gradient-to-r from-success to-success/80 hover:from-success/90 hover:to-success/70 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <CheckCircle className="h-4 w-4 ml-2" />
+                تایید و پرداخت
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
 };
 
 export default Installments;
+

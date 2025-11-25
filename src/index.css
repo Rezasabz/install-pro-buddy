@@ -319,3 +319,107 @@ All colors MUST be HSL.
 .animate-fade-scale {
   animation: fadeInScale 0.3s ease-out;
 }
+
+@keyframes gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient {
+  animation: gradient 3s ease infinite;
+}
+
+/* 3D Effects for Charts - 2025 Trends */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(251, 86, 7, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(251, 86, 7, 0.6);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.chart-3d {
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+.chart-card-3d {
+  transform: translateZ(20px);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+    0 1px 0 rgba(255, 255, 255, 0.2) inset;
+  backdrop-filter: blur(20px);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+}
+
+.chart-card-3d:hover {
+  transform: translateZ(30px) scale(1.02);
+  box-shadow: 
+    0 30px 80px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+    0 1px 0 rgba(255, 255, 255, 0.3) inset,
+    0 0 60px rgba(251, 86, 7, 0.2);
+}
+
+.chart-glow-primary {
+  filter: drop-shadow(0 0 20px rgba(251, 86, 7, 0.4));
+}
+
+.chart-glow-success {
+  filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.4));
+}
+
+.chart-glow-secondary {
+  filter: drop-shadow(0 0 20px rgba(131, 56, 236, 0.4));
+}
+
+.chart-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 100%
+  );
+  background-size: 2000px 100%;
+  animation: shimmer 3s infinite;
+}
+
+.dark .chart-card-3d {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 rgba(255, 255, 255, 0.1) inset;
+}
+
+.dark .chart-card-3d:hover {
+  box-shadow: 
+    0 30px 80px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+    0 1px 0 rgba(255, 255, 255, 0.15) inset,
+    0 0 60px rgba(251, 86, 7, 0.3);
+}

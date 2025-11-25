@@ -3,10 +3,10 @@ import uuid
 import hashlib
 from datetime import datetime
 
-from ..database import get_db
-from ..models import User, UserCreate, UserLogin
+from database import get_db
+from models import User, UserCreate, UserLogin
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter()
 
 def hash_password(password: str) -> str:
     """Hash password using SHA256"""
