@@ -40,6 +40,15 @@ const Investors = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; investorId: string }>({ open: false, investorId: '' });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; investorId: string; investorName: string }>({ open: false, investorId: '', investorName: '' });
+  const [capitalAdjustDialog, setCapitalAdjustDialog] = useState<{ open: boolean; investorId: string; investorName: string; currentCapital: number; type: 'add' | 'withdraw' }>({ 
+    open: false, 
+    investorId: '', 
+    investorName: '', 
+    currentCapital: 0,
+    type: 'add'
+  });
+  const [capitalAmount, setCapitalAmount] = useState("");
+  const [capitalDescription, setCapitalDescription] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -168,6 +177,83 @@ const Investors = () => {
       toast({
         title: "خطا",
         description: "خطا در حذف سرمایه‌گذار",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCapitalAdjust = (investor: Investor, type: 'add' | 'withdraw') => {
+    setCapitalAdjustDialog({
+      open: true,
+      investorId: investor.id,
+      investorName: investor.name,
+      currentCapital: investor.investmentAmount,
+      type
+    });
+    setCapitalAmount("");
+    setCapitalDescription("");
+  };
+
+  const handleCapitalAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numericValue = value.replace(/[^\d]/g, '');
+    
+    if (numericValue === '') {
+      setCapitalAmount('');
+      return;
+    }
+    
+    const number = parseInt(numericValue, 10);
+    const formatted = number.toLocaleString('en-US');
+    setCapitalAmount(formatted);
+  };
+
+  const confirmCapitalAdjust = async () => {
+    const amount = parseFloat(capitalAmount.replace(/,/g, ''));
+    
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "خطا",
+        description: "مبلغ نامعتبر است",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const adjustAmount = capitalAdjustDialog.type === 'add' ? amount : -amount;
+    
+    if (capitalAdjustDialog.type === 'withdraw' && adjustAmount + capitalAdjustDialog.currentCapital < 0) {
+      toast({
+        title: "خطا",
+        description: "مبلغ برداشت نمی‌تواند بیشتر از سرمایه فعلی باشد",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await investorsStore.adjustCapital(
+        capitalAdjustDialog.investorId,
+        adjustAmount,
+        capitalDescription || undefined
+      );
+      
+      toast({
+        title: "موفق",
+        description: capitalAdjustDialog.type === 'add' 
+          ? "سرمایه با موفقیت اضافه شد" 
+          : "سرمایه با موفقیت برداشت شد",
+      });
+      
+      setCapitalAdjustDialog({ open: false, investorId: '', investorName: '', currentCapital: 0, type: 'add' });
+      setCapitalAmount("");
+      setCapitalDescription("");
+      await loadData();
+    } catch (error) {
+      console.error('Error adjusting capital:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در تغییر سرمایه",
         variant: "destructive",
       });
     }
@@ -418,6 +504,25 @@ const Investors = () => {
                       >
                         {investor.status === 'active' ? 'فعال' : 'غیرفعال'}
                       </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCapitalAdjust(investor, 'add')}
+                        className="gap-1 text-primary hover:bg-primary/10 hover:border-primary/50 hover:scale-105 transition-all duration-200"
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                        افزودن
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCapitalAdjust(investor, 'withdraw')}
+                        className="gap-1 text-destructive hover:bg-destructive/10 hover:border-destructive/50 hover:scale-105 transition-all duration-200"
+                        disabled={investor.investmentAmount <= 0}
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                        برداشت
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -734,6 +839,89 @@ const Investors = () => {
                 </div>
               );
             })()}
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog تغییر سرمایه */}
+        <Dialog open={capitalAdjustDialog.open} onOpenChange={(open) => setCapitalAdjustDialog({ ...capitalAdjustDialog, open })}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent flex items-center gap-2">
+                {capitalAdjustDialog.type === 'add' ? (
+                  <ArrowUp className="h-5 w-5 text-primary" />
+                ) : (
+                  <ArrowDown className="h-5 w-5 text-destructive" />
+                )}
+                {capitalAdjustDialog.type === 'add' ? 'افزودن سرمایه' : 'برداشت سرمایه'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Card className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 border-primary/20">
+                <CardContent className="p-4">
+                  <div className="text-sm text-muted-foreground mb-1">سرمایه‌گذار</div>
+                  <div className="font-bold text-lg">{capitalAdjustDialog.investorName}</div>
+                  <div className="text-sm text-muted-foreground mt-2">
+                    سرمایه فعلی: <span className="font-semibold text-foreground">{formatCurrency(capitalAdjustDialog.currentCapital)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-2">
+                <Label htmlFor="capitalAmount" className="text-sm font-semibold flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  {capitalAdjustDialog.type === 'add' ? 'مبلغ افزودن' : 'مبلغ برداشت'} (تومان)
+                </Label>
+                <Input
+                  id="capitalAmount"
+                  type="text"
+                  value={capitalAmount}
+                  onChange={handleCapitalAmountChange}
+                  placeholder="مثال: ۱۰,۰۰۰,۰۰۰"
+                  dir="ltr"
+                  className="text-lg font-semibold"
+                />
+                {capitalAdjustDialog.type === 'withdraw' && capitalAmount && (
+                  <div className="text-xs text-muted-foreground">
+                    سرمایه پس از برداشت: {formatCurrency(capitalAdjustDialog.currentCapital - parseFloat(capitalAmount.replace(/,/g, '') || '0'))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="capitalDescription" className="text-sm font-semibold flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  توضیحات (اختیاری)
+                </Label>
+                <Input
+                  id="capitalDescription"
+                  value={capitalDescription}
+                  onChange={(e) => setCapitalDescription(e.target.value)}
+                  placeholder="توضیحات تغییر سرمایه..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setCapitalAdjustDialog({ ...capitalAdjustDialog, open: false })}
+                  className="flex-1"
+                >
+                  انصراف
+                </Button>
+                <Button
+                  onClick={confirmCapitalAdjust}
+                  className={cn(
+                    "flex-1",
+                    capitalAdjustDialog.type === 'add' 
+                      ? "bg-gradient-to-r from-primary via-secondary to-primary hover:opacity-90"
+                      : "bg-gradient-to-r from-destructive to-destructive/80 hover:from-destructive/90 hover:to-destructive/70"
+                  )}
+                >
+                  <CheckCircle2 className="h-4 w-4 ml-2" />
+                  {capitalAdjustDialog.type === 'add' ? 'افزودن' : 'برداشت'}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
 

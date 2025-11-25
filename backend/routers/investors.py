@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
+from pydantic import BaseModel
 import uuid
 from datetime import datetime
 
@@ -11,6 +12,10 @@ from models import (
     InvestorTransaction,
     InvestorTransactionCreate
 )
+
+class CapitalAdjustRequest(BaseModel):
+    amount: float
+    description: str = ""
 
 router = APIRouter()
 
@@ -207,3 +212,60 @@ def create_investor_transaction(transaction: InvestorTransactionCreate):
             "description": transaction.description,
             "date": date
         }
+
+@router.post("/{investor_id}/capital/adjust", response_model=Investor)
+def adjust_investor_capital(investor_id: str, request: CapitalAdjustRequest):
+    """Add or withdraw capital from an investor"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Get current investor
+        cursor.execute("""
+            SELECT investment_amount
+            FROM investors
+            WHERE id = ?
+        """, (investor_id,))
+        row = cursor.fetchone()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Investor not found")
+        
+        current_amount = row['investment_amount']
+        new_amount = current_amount + request.amount
+        
+        if new_amount < 0:
+            raise HTTPException(status_code=400, detail="Capital cannot be negative")
+        
+        # Update investor capital
+        cursor.execute("""
+            UPDATE investors
+            SET investment_amount = ?
+            WHERE id = ?
+        """, (new_amount, investor_id))
+        
+        # Create transaction
+        transaction_id = str(uuid.uuid4())
+        transaction_date = datetime.now().isoformat()
+        transaction_type = 'investment_add' if request.amount > 0 else 'investment_withdraw'
+        transaction_description = request.description or (
+            f"افزایش سرمایه {request.amount:,.0f} تومان" if request.amount > 0 
+            else f"برداشت سرمایه {abs(request.amount):,.0f} تومان"
+        )
+        
+        cursor.execute("""
+            INSERT INTO investor_transactions (
+                id, investor_id, type, amount, description, date
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            transaction_id,
+            investor_id,
+            transaction_type,
+            abs(request.amount),
+            transaction_description,
+            transaction_date
+        ))
+        
+        conn.commit()
+        
+        # Return updated investor
+        return get_investor(investor_id)

@@ -421,6 +421,12 @@ export const investorsStore = {
     apiCall(`/api/investors/${id}`, {
       method: 'DELETE',
     }),
+  
+  adjustCapital: (id: string, amount: number, description?: string): Promise<Investor> =>
+    apiCall(`/api/investors/${id}/capital/adjust`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, description: description || '' }),
+    }),
 };
 
 // Investor Transactions
