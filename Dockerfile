@@ -1,32 +1,39 @@
-# Frontend Dockerfile
+# ──────────────────────────────
+# مرحله بیلد خیلی کم‌مصرف
+# ──────────────────────────────
 FROM node:20-alpine AS builder
 
-# Set working directory
+# محدودیت سخت‌گیرانه رم برای Node.js (این خط حیاتیه!)
+ENV NODE_OPTIONS="--max-old-space-size=384"
+
 WORKDIR /app
 
-# Copy package files
+# اول فقط پکیج‌ها رو نصب کن (کش بشه و بعداً تکرار نشه)
 COPY package*.json ./
+RUN npm ci --omit=dev --legacy-peer-deps --prefer-offline --no-audit --silent
 
-# Install dependencies
-RUN npm ci
+# فقط فایل‌های لازم برای بیلد رو کپی کن
+COPY vite.config.ts ./
+COPY tsconfig*.json ./
+COPY index.html ./
+COPY public ./public
+COPY src ./src
 
-# Copy source code
-COPY . .
+# بیلد با کمترین مصرف ممکن
+RUN npm run build -- --mode production
 
-# Build the application
-RUN npm run build
+# ──────────────────────────────
+# مرحله نهایی (خیلی کوچک ~15-25 MB)
+# ──────────────────────────────
+FROM nginx:alpine AS production
 
-# Production stage
-FROM nginx:alpine
-
-# Copy built files to nginx
+# کپی فایل‌های بیلد شده
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration
+# تنظیمات nginx بهینه (gzip + cache)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port
 EXPOSE 80
 
-# Start nginx
+# nginx رو با کمترین مصرف مموری اجرا کن
 CMD ["nginx", "-g", "daemon off;"]
