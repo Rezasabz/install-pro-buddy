@@ -46,7 +46,6 @@ import {
 } from "@/lib/storeProvider";
 import { calculateProfit, getProfitCalculationLabel } from "@/lib/profitCalculations";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
-import { PDFButton } from "@/components/PDFButton";
 import { 
   calculateInstallments, 
   checkCapitalAvailability,
@@ -824,14 +823,6 @@ const Sales = () => {
                       پرداخت شده: {toPersianDigits(details.paidCount)} از {toPersianDigits(details.totalCount)} قسط
                     </div>
                     <div className="flex items-center gap-2">
-                      {details.customer && details.phone && (
-                        <PDFButton
-                          sale={sale}
-                          customer={details.customer}
-                          phone={details.phone}
-                          installments={details.installments}
-                        />
-                      )}
                       <Button
                         variant="outline"
                         size="sm"

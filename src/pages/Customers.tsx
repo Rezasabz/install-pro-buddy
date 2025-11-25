@@ -36,7 +36,6 @@ import { customersStore, Customer, salesStore, installmentsStore, phonesStore, S
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
 import { Plus, Edit, Trash2, Users, Phone, IdCard, Search, FileText, AlertCircle, CheckCircle, DollarSign, ShoppingCart, Eye, Calendar, MapPin, TrendingUp, CreditCard, Package, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { PDFButton } from "@/components/PDFButton";
 import { cn } from "@/lib/utils";
 
 const Customers = () => {

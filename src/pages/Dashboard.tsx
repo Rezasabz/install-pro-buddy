@@ -729,45 +729,85 @@ const Dashboard = () => {
         )}
         {/* AlertDialog پاک کردن تمام داده‌ها */}
         <AlertDialog open={clearDataDialog} onOpenChange={setClearDataDialog}>
-          <AlertDialogContent className="max-w-md">
-            <AlertDialogHeader>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-full bg-destructive/10">
-                  <Trash2 className="h-6 w-6 text-destructive" />
+          <AlertDialogContent className="max-w-lg p-0 gap-0 overflow-hidden border-destructive/20">
+            {/* Header با گرادیانت قرمز */}
+            <div className="relative bg-gradient-to-br from-destructive via-red-600 to-orange-600 p-6 pb-8 overflow-hidden">
+              <div className="absolute inset-0 bg-black/10" />
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full blur-2xl" />
+              
+              <div className="relative z-10 flex flex-col items-center text-center">
+                <div className="relative mb-4">
+                  <Trash2 className="h-16 w-16 text-white animate-pulse" />
+                  <div className="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse" />
                 </div>
-                <AlertDialogTitle className="text-xl font-bold bg-gradient-to-r from-destructive to-destructive/80 bg-clip-text text-transparent">
-                  پاک کردن تمام داده‌ها
+                <AlertDialogTitle className="text-2xl font-black text-white mb-2">
+                  ⚠️ پاک کردن تمام داده‌ها
                 </AlertDialogTitle>
-              </div>
-              <AlertDialogDescription className="text-right space-y-3 pt-2">
-                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <p className="text-sm font-semibold text-destructive mb-2 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
-                    هشدار مهم
-                  </p>
-                  <p className="text-sm text-foreground mb-3">
-                    تمام داده‌های زیر پاک خواهند شد:
-                  </p>
-                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                    <li>شرکا و سرمایه‌ها</li>
-                    <li>سرمایه‌گذاران</li>
-                    <li>موجودی گوشی‌ها</li>
-                    <li>فروش‌ها و اقساط</li>
-                    <li>مشتریان</li>
-                    <li>هزینه‌ها</li>
-                    <li>تراکنش‌ها</li>
-                  </ul>
-                </div>
-                <p className="text-base font-semibold text-destructive">
+                <p className="text-white/90 text-sm font-medium">
                   این عمل غیرقابل بازگشت است!
                 </p>
-                <p className="text-sm text-muted-foreground">
+              </div>
+            </div>
+
+            <AlertDialogDescription className="p-6 space-y-4 bg-background">
+              {/* کارت هشدار */}
+              <Card className="border-destructive/30 bg-destructive/5">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-destructive" />
+                    <CardTitle className="text-base font-bold text-destructive">
+                      هشدار مهم
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-foreground mb-3 font-medium">
+                    تمام داده‌های زیر به صورت دائمی حذف خواهند شد:
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-background/50 border border-border/50">
+                      <div className="h-2 w-2 rounded-full bg-destructive" />
+                      <span className="text-xs font-medium text-foreground">شرکا و سرمایه‌ها</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-background/50 border border-border/50">
+                      <div className="h-2 w-2 rounded-full bg-destructive" />
+                      <span className="text-xs font-medium text-foreground">سرمایه‌گذاران</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-background/50 border border-border/50">
+                      <div className="h-2 w-2 rounded-full bg-destructive" />
+                      <span className="text-xs font-medium text-foreground">موجودی گوشی‌ها</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-background/50 border border-border/50">
+                      <div className="h-2 w-2 rounded-full bg-destructive" />
+                      <span className="text-xs font-medium text-foreground">فروش‌ها و اقساط</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-background/50 border border-border/50">
+                      <div className="h-2 w-2 rounded-full bg-destructive" />
+                      <span className="text-xs font-medium text-foreground">مشتریان</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-background/50 border border-border/50">
+                      <div className="h-2 w-2 rounded-full bg-destructive" />
+                      <span className="text-xs font-medium text-foreground">هزینه‌ها</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-background/50 border border-border/50 col-span-2">
+                      <div className="h-2 w-2 rounded-full bg-destructive" />
+                      <span className="text-xs font-medium text-foreground">تراکنش‌ها و تمام اطلاعات مرتبط</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* پیام تایید */}
+              <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
+                <p className="text-sm text-center text-foreground font-semibold">
                   آیا مطمئن هستید که می‌خواهید تمام داده‌ها را پاک کنید؟
                 </p>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="gap-2 sm:gap-0">
-              <AlertDialogCancel className="hover:bg-accent hover:text-accent-foreground">
+              </div>
+            </AlertDialogDescription>
+
+            <AlertDialogFooter className="p-6 pt-0 gap-3 bg-background">
+              <AlertDialogCancel className="h-11 text-base font-semibold flex-1 border-2 hover:bg-accent hover:text-accent-foreground">
                 انصراف
               </AlertDialogCancel>
               <AlertDialogAction
@@ -786,10 +826,10 @@ const Dashboard = () => {
                     });
                   }
                 }}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="h-11 text-base font-semibold flex-1 bg-gradient-to-r from-destructive via-red-600 to-orange-600 hover:from-destructive/90 hover:via-red-500 hover:to-orange-500 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
               >
                 <Trash2 className="h-4 w-4 ml-2" />
-                پاک کردن
+                پاک کردن همه داده‌ها
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
