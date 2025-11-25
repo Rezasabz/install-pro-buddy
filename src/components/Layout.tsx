@@ -67,8 +67,8 @@ const Layout = ({ children }: LayoutProps) => {
             </span>
           </Link>
           
-          {/* Desktop Navigation */}
-          <nav className="ml-auto hidden lg:flex items-center gap-1.5">
+          {/* Desktop Navigation - Center */}
+          <nav className="hidden lg:flex items-center gap-1.5 flex-1 justify-center">
             {navigation.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
@@ -95,10 +95,13 @@ const Layout = ({ children }: LayoutProps) => {
                 </Link>
               );
             })}
-            
+          </nav>
+
+          {/* User Actions - Left Side */}
+          <div className="hidden lg:flex items-center gap-2.5 mr-auto">
             {/* User Badge */}
             {user && (
-              <div className="flex items-center gap-2.5 px-3.5 py-1.5 mx-2 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-full border border-primary/20 backdrop-blur-sm">
+              <div className="flex items-center gap-2.5 px-3.5 py-1.5 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-full border border-primary/20 backdrop-blur-sm">
                 <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
                   <UserIcon className="h-4 w-4 text-white" />
                 </div>
@@ -130,13 +133,13 @@ const Layout = ({ children }: LayoutProps) => {
               <LogOut className="h-4 w-4" />
               <span className="hidden xl:inline">خروج</span>
             </Button>
-          </nav>
+          </div>
 
           {/* Mobile Menu Button */}
           <Button
             variant="ghost"
             size="icon"
-            className="ml-auto lg:hidden h-9 w-9 rounded-full"
+            className="mr-auto lg:hidden h-9 w-9 rounded-full"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? (
