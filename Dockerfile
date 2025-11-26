@@ -13,6 +13,10 @@ RUN npm ci --only=production && \
 # کپی سورس
 COPY . .
 
+# تنظیم environment variable برای build
+ARG VITE_API_URL=http://185.92.182.51:8000
+ENV VITE_API_URL=$VITE_API_URL
+
 # بیلد (حالا vite پیدا می‌شه)
 RUN npm run build
 
