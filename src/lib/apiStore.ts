@@ -34,6 +34,11 @@ export interface Phone {
   sellingPrice: number;
   status: 'available' | 'sold';
   purchaseDate: string;
+  color?: string;
+  storage?: string;
+  condition?: string;
+  purchaseSource?: string;
+  notes?: string;
 }
 
 export interface Customer {
@@ -157,11 +162,11 @@ export const partnersStore = {
 // Phones Store
 export const phonesStore = {
   getAll: async (): Promise<Phone[]> => {
-    return await apiCall<Phone[]>('/api/phones');
+    return await apiCall<Phone[]>('/api/phones/');
   },
 
   add: async (phone: Omit<Phone, 'id'>): Promise<Phone> => {
-    return await apiCall<Phone>('/api/phones', {
+    return await apiCall<Phone>('/api/phones/', {
       method: 'POST',
       body: JSON.stringify(phone),
     });

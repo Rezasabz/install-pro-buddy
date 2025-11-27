@@ -29,30 +29,33 @@ export function calculateProfit(
 
   switch (calculationType) {
     case 'fixed_4_percent': {
-      // گزینه ۱: سود ثابت ۴٪ (یک‌بار روی کل مبلغ)
-      totalProfit = remainingAmount * 0.04;
-      totalPayable = remainingAmount + totalProfit;
-      monthlyPayment = Math.ceil(totalPayable / installmentMonths / 1000) * 1000;
+      // گزینه ۱: سود مانده هر ماه (درصد روی مانده بدهی هر ماه)
+      const rate = (customRate || 4) / 100; // درصد قابل تنظیم
+      const principalPerMonth = remainingAmount / installmentMonths;
+      
+      let currentDebt = remainingAmount;
+      totalProfit = 0;
 
       // محاسبه اقساط
-      let remaining = totalPayable;
-      const principalPerMonth = remainingAmount / installmentMonths;
-      const interestPerMonth = totalProfit / installmentMonths;
-
       for (let i = 1; i <= installmentMonths; i++) {
-        const isLast = i === installmentMonths;
-        const installmentAmount = isLast ? remaining : monthlyPayment;
+        const interestAmount = Math.round(currentDebt * rate);
+        const principalAmount = Math.round(principalPerMonth);
+        const totalAmount = principalAmount + interestAmount;
+        
+        totalProfit += interestAmount;
+        currentDebt -= principalAmount;
         
         installments.push({
           installmentNumber: i,
-          principalAmount: Math.round(principalPerMonth),
-          interestAmount: Math.round(interestPerMonth),
-          totalAmount: installmentAmount,
-          remainingDebt: Math.max(0, remaining - installmentAmount),
+          principalAmount,
+          interestAmount,
+          totalAmount,
+          remainingDebt: Math.max(0, Math.round(currentDebt)),
         });
-        
-        remaining -= installmentAmount;
       }
+      
+      totalPayable = remainingAmount + totalProfit;
+      monthlyPayment = installments.length > 0 ? installments[0].totalAmount : 0;
       break;
     }
 
@@ -129,9 +132,9 @@ export function calculateProfit(
 export function getProfitCalculationLabel(type: ProfitCalculationType): string {
   switch (type) {
     case 'fixed_4_percent':
-      return 'سود ثابت ۴٪';
+      return 'سود مانده هر ماه';
     case 'monthly_4_percent_lda':
-      return 'سود ماهیانه ۴٪ روی باقیمانده (LDA)';
+      return 'سود ماهیانه ۴٪';
     case 'custom_annual':
       return 'سود دلخواه';
     default:

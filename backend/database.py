@@ -52,7 +52,12 @@ def init_db():
                 purchase_price REAL NOT NULL,
                 selling_price REAL NOT NULL,
                 status TEXT NOT NULL DEFAULT 'available',
-                purchase_date TEXT NOT NULL
+                purchase_date TEXT NOT NULL,
+                color TEXT,
+                storage TEXT,
+                condition TEXT DEFAULT 'new',
+                purchase_source TEXT,
+                notes TEXT
             )
         """)
         

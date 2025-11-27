@@ -30,12 +30,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: result.success, message: result.message };
   };
 
-  const register = async (fullName: string, mobile: string, password: string) => {
-    const result = await authRegister(fullName, mobile, password);
-    if (result.success && result.user) {
-      setUser(result.user);
-    }
-    return { success: result.success, message: result.message };
+  // Register removed - only admin can create users
+  const register = async () => {
+    return { success: false, message: 'ثبت‌نام غیرفعال است' };
   };
 
   const logout = () => {

@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { DataProvider } from "@/contexts/DataContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import Dashboard from "./pages/Dashboard";
+import DashboardWrapper from "./pages/DashboardWrapper";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Partners from "./pages/Partners";
@@ -17,6 +17,7 @@ import Customers from "./pages/Customers";
 import Installments from "./pages/Installments";
 import Expenses from "./pages/Expenses";
 import Investors from "./pages/Investors";
+import Users from "./pages/Users";
 import NotFound from "./pages/NotFound";
 import { needsMigration, migrateOldData } from "./lib/migration";
 import { fixPartnerData } from "./lib/fixData";
@@ -57,7 +58,7 @@ const App = () => {
                 <Route path="/auth" element={<Navigate to="/login" replace />} />
                 
                 {/* Protected routes */}
-                <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/" element={<ProtectedRoute><DashboardWrapper /></ProtectedRoute>} />
                 <Route path="/partners" element={<ProtectedRoute><Partners /></ProtectedRoute>} />
                 <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
                 <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
@@ -65,6 +66,7 @@ const App = () => {
                 <Route path="/installments" element={<ProtectedRoute><Installments /></ProtectedRoute>} />
                 <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
                 <Route path="/investors" element={<ProtectedRoute><Investors /></ProtectedRoute>} />
+                <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
                 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

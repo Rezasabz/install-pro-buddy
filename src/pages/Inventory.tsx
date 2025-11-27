@@ -18,7 +18,6 @@ import {
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -34,7 +33,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { phonesStore, Phone } from "@/lib/storeProvider";
 import { formatCurrency, toJalaliDate } from "@/lib/persian";
-import { Plus, Edit, Trash2, Smartphone, Package, DollarSign, Palette, HardDrive, Info, ShoppingBag, Calendar, Hash, AlertCircle } from "lucide-react";
+import { Plus, Edit, Trash2, Smartphone, Package, DollarSign, Palette, HardDrive, Info, ShoppingBag, Calendar, Hash, AlertCircle, Eye, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { JalaliDatePicker } from "@/components/JalaliDatePicker";
 import { cn } from "@/lib/utils";
@@ -44,6 +43,7 @@ const Inventory = () => {
   const [phones, setPhones] = useState<Phone[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPhone, setEditingPhone] = useState<Phone | null>(null);
+  const [detailsPhone, setDetailsPhone] = useState<Phone | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; phoneId: string; phoneInfo: string }>({ open: false, phoneId: '', phoneInfo: '' });
   const [formData, setFormData] = useState({
     brand: "",
@@ -134,7 +134,6 @@ const Inventory = () => {
       return;
     }
 
-    // بستن dialog و نمایش loading
     setIsDialogOpen(false);
     setIsLoading(true);
     setLoadingMessage(editingPhone ? "در حال بروزرسانی گوشی..." : "در حال افزودن گوشی...");
@@ -148,6 +147,11 @@ const Inventory = () => {
           purchasePrice,
           sellingPrice,
           purchaseDate: purchaseDate.toISOString(),
+          color: formData.color || undefined,
+          storage: formData.storage || undefined,
+          condition: formData.condition,
+          purchaseSource: formData.purchaseSource || undefined,
+          notes: formData.notes || undefined,
         });
         toast({
           title: "موفق",
@@ -162,6 +166,11 @@ const Inventory = () => {
           sellingPrice,
           status: 'available',
           purchaseDate: purchaseDate.toISOString(),
+          color: formData.color || undefined,
+          storage: formData.storage || undefined,
+          condition: formData.condition,
+          purchaseSource: formData.purchaseSource || undefined,
+          notes: formData.notes || undefined,
         });
         toast({
           title: "موفق",
@@ -184,8 +193,6 @@ const Inventory = () => {
       setPurchaseDate(new Date());
       setEditingPhone(null);
       await loadPhones();
-      
-      // Refresh phones in other pages (like Sales)
       refreshPhones();
     } catch (error: unknown) {
       console.error('Error saving phone:', error);
@@ -210,11 +217,11 @@ const Inventory = () => {
       imei: phone.imei,
       purchasePrice: phone.purchasePrice.toLocaleString('en-US'),
       sellingPrice: phone.sellingPrice.toLocaleString('en-US'),
-      color: "",
-      storage: "",
-      condition: "new",
-      purchaseSource: "",
-      notes: "",
+      color: phone.color || "",
+      storage: phone.storage || "",
+      condition: phone.condition || "new",
+      purchaseSource: phone.purchaseSource || "",
+      notes: phone.notes || "",
     });
     setPurchaseDate(new Date(phone.purchaseDate));
     setIsDialogOpen(true);
@@ -579,7 +586,6 @@ const Inventory = () => {
                 </div>
 
                 <div className="relative pt-6 border-t border-border/50">
-                  {/* دکمه افزودن - Floating با Animated Gradient */}
                   <button
                     type="submit"
                     className="group relative w-full h-14 overflow-hidden rounded-xl font-semibold text-white shadow-2xl
@@ -589,22 +595,16 @@ const Inventory = () => {
                                hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(251,146,60,0.4)]
                                active:scale-[0.98]"
                   >
-                    {/* Animated Gradient Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
                                     translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-in-out" />
-                    
-                    {/* Glow Effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-orange-400/50 via-red-400/50 to-purple-400/50 
                                     opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500 -z-10" />
-                    
-                    {/* Content */}
                     <span className="relative z-10 flex items-center justify-center gap-2">
                       <Plus className="h-5 w-5 group-hover:rotate-90 transition-transform duration-500" />
                       {editingPhone ? "بروزرسانی گوشی" : "افزودن گوشی"}
                     </span>
                   </button>
 
-                  {/* دکمه انصراف - Glassmorphic با Subtle Animation */}
                   <button
                     type="button"
                     onClick={() => setIsDialogOpen(false)}
@@ -616,10 +616,8 @@ const Inventory = () => {
                                transition-all duration-300 ease-out
                                relative overflow-hidden group"
                   >
-                    {/* Subtle Shine Effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent 
                                     translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-                    
                     <span className="relative z-10 flex items-center justify-center gap-2">
                       <span className="text-sm">انصراف</span>
                     </span>
@@ -695,78 +693,184 @@ const Inventory = () => {
           </Card>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {phones.map((phone, index) => (
-            <Card 
-              key={phone.id} 
-              className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group animate-slide-in"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <CardHeader className="relative z-10">
-                <CardTitle className="flex justify-between items-start">
-                  <div>
-                    <div className="font-bold text-lg">{phone.brand}</div>
-                    <div className="text-sm font-normal text-muted-foreground/70 mt-0.5">
-                      {phone.model}
+        {/* کارت‌های موبایل با استایل مدرن 2025 */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {phones.map((phone, index) => {
+            const profit = phone.sellingPrice - phone.purchasePrice;
+            const profitPercent = ((profit / phone.purchasePrice) * 100).toFixed(1);
+            
+            return (
+              <Card 
+                key={phone.id} 
+                className="group relative overflow-hidden bg-gradient-to-br from-card via-card to-card/80 border-2 border-border/50 hover:border-primary/30 transition-all duration-500 hover:shadow-2xl hover:scale-[1.02] animate-slide-in"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                {/* Background Gradient Effect */}
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                
+                {/* Sparkle Effect on Hover */}
+                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                  <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                </div>
+
+                <CardHeader className="relative z-10 pb-3">
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      {/* Brand & Model */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-2 rounded-lg bg-gradient-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-colors duration-300">
+                          <Smartphone className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-lg truncate group-hover:text-primary transition-colors duration-300">
+                            {phone.brand}
+                          </h3>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {phone.model}
+                          </p>
+                        </div>
+                      </div>
                     </div>
+                    
+                    {/* Status Badge */}
+                    <Badge 
+                      variant={phone.status === 'available' ? 'default' : 'secondary'}
+                      className={cn(
+                        "shrink-0 shadow-lg transition-all duration-300",
+                        phone.status === 'available' 
+                          ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 group-hover:shadow-green-500/50" 
+                          : "bg-gradient-to-r from-gray-400 to-gray-500 text-white border-0"
+                      )}
+                    >
+                      {phone.status === 'available' ? 'موجود' : 'فروخته شده'}
+                    </Badge>
                   </div>
-                  <Badge 
-                    variant={phone.status === 'available' ? 'default' : 'secondary'}
-                    className={cn(
-                      phone.status === 'available' && "bg-success/10 text-success border-success/20",
-                      phone.status === 'sold' && "bg-muted text-muted-foreground"
+                </CardHeader>
+
+                <CardContent className="space-y-4 relative z-10">
+                  {/* Specs Grid */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {phone.color && (
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors duration-300">
+                        <Palette className="h-4 w-4 text-primary shrink-0" />
+                        <span className="text-xs font-medium truncate">{phone.color}</span>
+                      </div>
                     )}
-                  >
-                    {phone.status === 'available' ? 'موجود' : 'فروخته شده'}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 relative z-10">
-                <div className="text-xs text-muted-foreground/70 bg-muted/30 p-2 rounded-md">
-                  IMEI: {phone.imei}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-2 rounded-lg hover:bg-accent/30 transition-colors duration-200">
-                    <div className="text-xs text-muted-foreground/70 mb-1">قیمت خرید</div>
-                    <div className="font-bold text-foreground">
-                      {formatCurrency(phone.purchasePrice)}
+                    {phone.storage && (
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors duration-300">
+                        <HardDrive className="h-4 w-4 text-secondary shrink-0" />
+                        <span className="text-xs font-medium truncate">{phone.storage} GB</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* IMEI */}
+                  <div className="p-3 rounded-lg bg-gradient-to-r from-muted/50 to-muted/30 border border-border/50 group-hover:border-primary/30 transition-colors duration-300">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Hash className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground font-medium">IMEI</span>
+                    </div>
+                    <p className="text-sm font-mono font-semibold text-foreground">{phone.imei}</p>
+                  </div>
+
+                  {/* Price Cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Purchase Price */}
+                    <div className="relative overflow-hidden p-3 rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20 group-hover:border-orange-500/40 transition-all duration-300">
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-orange-500/20 to-transparent rounded-full blur-2xl" />
+                      <div className="relative">
+                        <div className="flex items-center gap-1 mb-1">
+                          <DollarSign className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                          <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">خرید</span>
+                        </div>
+                        <p className="text-sm font-bold text-orange-700 dark:text-orange-300">
+                          {formatCurrency(phone.purchasePrice)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Selling Price */}
+                    <div className="relative overflow-hidden p-3 rounded-xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 group-hover:border-green-500/40 transition-all duration-300">
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-green-500/20 to-transparent rounded-full blur-2xl" />
+                      <div className="relative">
+                        <div className="flex items-center gap-1 mb-1">
+                          <DollarSign className="h-3 w-3 text-green-600 dark:text-green-400" />
+                          <span className="text-xs text-green-600 dark:text-green-400 font-medium">فروش</span>
+                        </div>
+                        <p className="text-sm font-bold text-green-700 dark:text-green-300">
+                          {formatCurrency(phone.sellingPrice)}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="p-2 rounded-lg hover:bg-primary/10 transition-colors duration-200">
-                    <div className="text-xs text-muted-foreground/70 mb-1">قیمت فروش</div>
-                    <div className="font-bold text-primary">
-                      {formatCurrency(phone.sellingPrice)}
+
+                  {/* Profit Badge */}
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 border border-purple-500/20">
+                    <span className="text-xs font-medium text-muted-foreground">سود پیش‌بینی</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-purple-600 dark:text-purple-400">
+                        {formatCurrency(profit)}
+                      </span>
+                      <Badge className="bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30 text-xs">
+                        {profitPercent}%
+                      </Badge>
                     </div>
                   </div>
-                </div>
-                <div className="text-xs text-muted-foreground/70 pt-2 border-t border-border/50">
-                  تاریخ خرید: {toJalaliDate(phone.purchaseDate)}
-                </div>
-                {phone.status === 'available' && (
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 gap-2 hover:bg-primary/10 hover:border-primary/50 hover:scale-105 transition-all duration-200"
-                      onClick={() => handleEdit(phone)}
-                    >
-                      <Edit className="h-3 w-3" />
-                      ویرایش
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(phone.id, phone)}
-                      className="hover:bg-destructive/10 hover:border-destructive/50 hover:scale-105 transition-all duration-200"
-                    >
-                      <Trash2 className="h-3 w-3 text-destructive" />
-                    </Button>
+
+                  {/* Date */}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t border-border/50">
+                    <Calendar className="h-3 w-3" />
+                    <span>تاریخ خرید: {toJalaliDate(phone.purchaseDate)}</span>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-3">
+                    {phone.status === 'available' && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 gap-2 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/30 hover:border-blue-500/50 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-md"
+                          onClick={() => handleEdit(phone)}
+                        >
+                          <Edit className="h-3 w-3" />
+                          ویرایش
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-md"
+                          onClick={() => setDetailsPhone(phone)}
+                        >
+                          <Eye className="h-3 w-3" />
+                          جزئیات
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(phone.id, phone)}
+                          className="bg-gradient-to-r from-red-500/10 to-rose-500/10 border-red-500/30 hover:border-red-500/50 hover:bg-red-500/20 text-red-700 dark:text-red-300 hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-md"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </>
+                    )}
+                    {phone.status === 'sold' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-md"
+                        onClick={() => setDetailsPhone(phone)}
+                      >
+                        <Eye className="h-3 w-3" />
+                        مشاهده جزئیات
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {phones.length === 0 && (
@@ -786,10 +890,209 @@ const Inventory = () => {
           </Card>
         )}
 
+        {/* مودال جزئیات - استایل مدرن 2025 */}
+        <Dialog open={!!detailsPhone} onOpenChange={(open) => !open && setDetailsPhone(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+            {detailsPhone && (
+              <>
+                {/* Header با Gradient */}
+                <div className="relative bg-gradient-to-br from-primary via-primary/90 to-secondary p-8 overflow-hidden">
+                  {/* Background Pattern */}
+                  <div className="absolute inset-0 opacity-10">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full blur-3xl" />
+                    <div className="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full blur-3xl" />
+                  </div>
+                  
+                  <div className="relative z-10">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30">
+                          <Smartphone className="h-8 w-8 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-3xl font-bold text-white mb-1">
+                            {detailsPhone.brand}
+                          </h2>
+                          <p className="text-white/90 text-lg">
+                            {detailsPhone.model}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge 
+                        className={cn(
+                          "text-sm px-3 py-1 shadow-lg",
+                          detailsPhone.status === 'available' 
+                            ? "bg-green-500 text-white border-0" 
+                            : "bg-gray-500 text-white border-0"
+                        )}
+                      >
+                        {detailsPhone.status === 'available' ? 'موجود' : 'فروخته شده'}
+                      </Badge>
+                    </div>
+                    
+                    {/* IMEI با استایل خاص */}
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20">
+                      <Hash className="h-4 w-4 text-white/80" />
+                      <span className="text-sm text-white/80 font-medium">IMEI:</span>
+                      <span className="text-white font-mono font-bold">{detailsPhone.imei}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 space-y-6 bg-background">
+                  {/* مشخصات فنی */}
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-bold flex items-center gap-2 text-foreground">
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-primary/10 to-secondary/10">
+                        <Info className="h-5 w-5 text-primary" />
+                      </div>
+                      مشخصات فنی
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      {detailsPhone.color && (
+                        <div className="p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Palette className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                            <span className="text-xs font-medium text-muted-foreground">رنگ</span>
+                          </div>
+                          <p className="text-sm font-bold text-purple-700 dark:text-purple-300">{detailsPhone.color}</p>
+                        </div>
+                      )}
+                      {detailsPhone.storage && (
+                        <div className="p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <HardDrive className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span className="text-xs font-medium text-muted-foreground">حافظه</span>
+                          </div>
+                          <p className="text-sm font-bold text-blue-700 dark:text-blue-300">{detailsPhone.storage} GB</p>
+                        </div>
+                      )}
+                      {detailsPhone.condition && (
+                        <div className="p-4 rounded-xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Info className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            <span className="text-xs font-medium text-muted-foreground">وضعیت</span>
+                          </div>
+                          <p className="text-sm font-bold text-green-700 dark:text-green-300">
+                            {detailsPhone.condition === 'new' ? 'نو' : detailsPhone.condition === 'used' ? 'کارکرده' : 'بازسازی شده'}
+                          </p>
+                        </div>
+                      )}
+                      {detailsPhone.purchaseSource && (
+                        <div className="p-4 rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <ShoppingBag className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                            <span className="text-xs font-medium text-muted-foreground">منبع خرید</span>
+                          </div>
+                          <p className="text-sm font-bold text-orange-700 dark:text-orange-300">{detailsPhone.purchaseSource}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* اطلاعات مالی */}
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-bold flex items-center gap-2 text-foreground">
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-warning/10 to-yellow-500/10">
+                        <DollarSign className="h-5 w-5 text-warning" />
+                      </div>
+                      اطلاعات مالی
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* قیمت خرید */}
+                      <div className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-orange-500/10 to-red-500/10 border-2 border-orange-500/30">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-orange-500/20 to-transparent rounded-full blur-2xl" />
+                        <div className="relative">
+                          <div className="flex items-center gap-2 mb-2">
+                            <DollarSign className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                            <span className="text-sm font-medium text-orange-600 dark:text-orange-400">قیمت خرید</span>
+                          </div>
+                          <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                            {formatCurrency(detailsPhone.purchasePrice)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* قیمت فروش */}
+                      <div className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-2 border-green-500/30">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-green-500/20 to-transparent rounded-full blur-2xl" />
+                        <div className="relative">
+                          <div className="flex items-center gap-2 mb-2">
+                            <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+                            <span className="text-sm font-medium text-green-600 dark:text-green-400">قیمت فروش</span>
+                          </div>
+                          <p className="text-2xl font-bold text-green-700 dark:text-green-300">
+                            {formatCurrency(detailsPhone.sellingPrice)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* سود */}
+                      <div className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-2 border-purple-500/30">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-500/20 to-transparent rounded-full blur-2xl" />
+                        <div className="relative">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                            <span className="text-sm font-medium text-purple-600 dark:text-purple-400">سود پیش‌بینی</span>
+                          </div>
+                          <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+                            {formatCurrency(detailsPhone.sellingPrice - detailsPhone.purchasePrice)}
+                          </p>
+                          <Badge className="mt-2 bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30">
+                            {(((detailsPhone.sellingPrice - detailsPhone.purchasePrice) / detailsPhone.purchasePrice) * 100).toFixed(1)}%
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* تاریخ خرید */}
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-muted/50 to-muted/30 border border-border/50">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Calendar className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium mb-1">تاریخ خرید</p>
+                        <p className="text-sm font-bold text-foreground">{toJalaliDate(detailsPhone.purchaseDate)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* توضیحات */}
+                  {detailsPhone.notes && (
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-bold flex items-center gap-2 text-foreground">
+                        <div className="p-2 rounded-lg bg-gradient-to-br from-secondary/10 to-primary/10">
+                          <Info className="h-5 w-5 text-secondary" />
+                        </div>
+                        توضیحات
+                      </h3>
+                      <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
+                        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                          {detailsPhone.notes}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* دکمه بستن */}
+                  <Button
+                    onClick={() => setDetailsPhone(null)}
+                    className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 transition-all duration-300 shadow-lg hover:shadow-xl"
+                  >
+                    بستن
+                  </Button>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+
         {/* AlertDialog حذف گوشی */}
         <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
           <AlertDialogContent className="max-w-lg p-0 gap-0 overflow-hidden border-destructive/20">
-            {/* Header با gradient */}
             <div className="relative bg-gradient-to-br from-destructive via-destructive/90 to-destructive/80 p-6">
               <div className="absolute inset-0 bg-black/10" />
               <div className="relative z-10 flex flex-col items-center text-center space-y-4">
@@ -805,7 +1108,6 @@ const Inventory = () => {
               </div>
             </div>
 
-            {/* Content */}
             <div className="p-6 space-y-4 bg-background">
               <AlertDialogDescription className="text-right space-y-4">
                 <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
@@ -847,7 +1149,6 @@ const Inventory = () => {
               </AlertDialogDescription>
             </div>
 
-            {/* Footer */}
             <AlertDialogFooter className="p-6 pt-0 gap-3 bg-background">
               <AlertDialogCancel className="flex-1 h-11 text-base font-semibold border-2 hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200">
                 انصراف

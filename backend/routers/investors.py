@@ -122,6 +122,9 @@ def update_investor(investor_id: str, investor: InvestorUpdate):
         if investor.total_profit is not None:
             updates.append("total_profit = ?")
             values.append(investor.total_profit)
+        if investor.start_date is not None:
+            updates.append("start_date = ?")
+            values.append(investor.start_date)
         if investor.status is not None:
             updates.append("status = ?")
             values.append(investor.status)
@@ -215,7 +218,7 @@ def create_investor_transaction(transaction: InvestorTransactionCreate):
 
 @router.post("/{investor_id}/capital/adjust", response_model=Investor)
 def adjust_investor_capital(investor_id: str, request: CapitalAdjustRequest):
-    """Add or withdraw capital from an investor"""
+    """Add or withdraw capital from an investor and update total capital in partners"""
     with get_db() as conn:
         cursor = conn.cursor()
         
@@ -242,6 +245,27 @@ def adjust_investor_capital(investor_id: str, request: CapitalAdjustRequest):
             SET investment_amount = ?
             WHERE id = ?
         """, (new_amount, investor_id))
+        
+        # اضافه کردن سرمایه به سرمایه کل شرکا
+        # سرمایه سرمایه‌گذار به صورت متناسب بین شرکا توزیع می‌شود
+        cursor.execute("SELECT id, capital FROM partners")
+        partners = cursor.fetchall()
+        
+        if partners:
+            total_capital = sum(p['capital'] for p in partners)
+            
+            for partner in partners:
+                # محاسبه سهم هر شریک
+                share = partner['capital'] / total_capital if total_capital > 0 else 1.0 / len(partners)
+                capital_change = request.amount * share
+                
+                # آپدیت سرمایه شریک
+                cursor.execute("""
+                    UPDATE partners
+                    SET capital = capital + ?,
+                        available_capital = available_capital + ?
+                    WHERE id = ?
+                """, (capital_change, capital_change, partner['id']))
         
         # Create transaction
         transaction_id = str(uuid.uuid4())

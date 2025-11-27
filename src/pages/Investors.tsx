@@ -27,9 +27,14 @@ import {
   investorTransactionsStore,
   Investor,
   InvestorTransaction,
+  partnersStore,
+  salesStore,
+  installmentsStore,
+  expensesStore,
 } from "@/lib/storeProvider";
+import { calculateFinancialsFromData } from "@/lib/profitCalculator";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
-import { Plus, TrendingUp, DollarSign, Trash2, Eye, User, Phone, IdCard, Calendar, Percent, Wallet, CheckCircle2, FileText, ArrowUp, ArrowDown, Activity, CreditCard, AlertCircle } from "lucide-react";
+import { Plus, TrendingUp, DollarSign, Trash2, Eye, User, Phone, IdCard, Calendar, Percent, Wallet, CheckCircle2, FileText, ArrowUp, ArrowDown, Activity, CreditCard, AlertCircle, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { JalaliDatePicker } from "@/components/JalaliDatePicker";
@@ -38,6 +43,7 @@ const Investors = () => {
   const [investors, setInvestors] = useState<Investor[]>([]);
   const [transactions, setTransactions] = useState<InvestorTransaction[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingInvestor, setEditingInvestor] = useState<Investor | null>(null);
   const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; investorId: string }>({ open: false, investorId: '' });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; investorId: string; investorName: string }>({ open: false, investorId: '', investorName: '' });
   const [capitalAdjustDialog, setCapitalAdjustDialog] = useState<{ open: boolean; investorId: string; investorName: string; currentCapital: number; type: 'add' | 'withdraw' }>({ 
@@ -49,12 +55,17 @@ const Investors = () => {
   });
   const [capitalAmount, setCapitalAmount] = useState("");
   const [capitalDescription, setCapitalDescription] = useState("");
+  const [paymentConfirmDialog, setPaymentConfirmDialog] = useState<{
+    open: boolean;
+    investor: Investor | null;
+    isFullMonth: boolean;
+  }>({ open: false, investor: null, isFullMonth: true });
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
     nationalId: "",
     investmentAmount: "",
-    profitRate: "4",
+    profitRate: "3.5", // پیش‌فرض: 3.5%
   });
   const [startDate, setStartDate] = useState<Date>(new Date());
   const { toast } = useToast();
@@ -98,6 +109,137 @@ const Investors = () => {
     setFormData({ ...formData, investmentAmount: formatted });
   };
 
+  const handleEdit = (investor: Investor) => {
+    setEditingInvestor(investor);
+    setFormData({
+      name: investor.name,
+      phone: investor.phone,
+      nationalId: investor.nationalId,
+      investmentAmount: investor.investmentAmount.toLocaleString('en-US'),
+      profitRate: investor.profitRate.toString(),
+    });
+    setStartDate(new Date(investor.startDate));
+    setIsDialogOpen(true);
+  };
+
+  // محاسبه سود روزانه
+  const calculateDailyProfit = (investor: Investor): number => {
+    const monthlyProfit = (investor.profitRate / 100) * investor.investmentAmount;
+    const dailyProfit = monthlyProfit / 30; // تقسیم بر 30 روز
+    return dailyProfit;
+  };
+
+  // محاسبه سود تا امروز (از آخرین پرداخت یا تاریخ شروع)
+  const calculateAccruedProfit = (investor: Investor): { days: number; profit: number } => {
+    const lastPayment = transactions
+      .filter(t => t.investorId === investor.id && t.type === 'profit_payment')
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    
+    const startDate = lastPayment 
+      ? new Date(lastPayment.date)
+      : new Date(investor.startDate);
+    
+    const now = new Date();
+    const daysPassed = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    const dailyProfit = calculateDailyProfit(investor);
+    const accruedProfit = dailyProfit * daysPassed;
+    
+    return { days: daysPassed, profit: accruedProfit };
+  };
+
+  // محاسبه تاریخ پرداخت بعدی
+  const getNextPaymentDate = (investor: Investor): Date => {
+    const startDate = new Date(investor.startDate);
+    const now = new Date();
+    
+    // محاسبه تعداد ماه‌های گذشته
+    const monthsPassed = (now.getFullYear() - startDate.getFullYear()) * 12 + 
+                         (now.getMonth() - startDate.getMonth());
+    
+    // تاریخ پرداخت بعدی
+    const nextPayment = new Date(startDate);
+    nextPayment.setMonth(startDate.getMonth() + monthsPassed + 1);
+    
+    return nextPayment;
+  };
+
+  // بررسی اینکه آیا زمان پرداخت رسیده
+  const isPaymentDue = (investor: Investor): boolean => {
+    const lastPayment = transactions
+      .filter(t => t.investorId === investor.id && t.type === 'profit_payment')
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    
+    if (!lastPayment) {
+      // اگه هیچ پرداختی نداشته، بررسی کن که یک ماه از تاریخ شروع گذشته باشه
+      const startDate = new Date(investor.startDate);
+      const now = new Date();
+      const monthsPassed = (now.getFullYear() - startDate.getFullYear()) * 12 + 
+                           (now.getMonth() - startDate.getMonth());
+      return monthsPassed >= 1;
+    }
+    
+    // بررسی که یک ماه از آخرین پرداخت گذشته باشه
+    const lastPaymentDate = new Date(lastPayment.date);
+    const now = new Date();
+    const monthsSinceLastPayment = (now.getFullYear() - lastPaymentDate.getFullYear()) * 12 + 
+                                    (now.getMonth() - lastPaymentDate.getMonth());
+    return monthsSinceLastPayment >= 1;
+  };
+
+  const showPaymentConfirm = (investor: Investor, isFullMonth: boolean) => {
+    setPaymentConfirmDialog({ open: true, investor, isFullMonth });
+  };
+
+  const confirmPayProfit = async () => {
+    const { investor, isFullMonth } = paymentConfirmDialog;
+    if (!investor) return;
+
+    try {
+      let investorProfit: number;
+      let description: string;
+      
+      if (isFullMonth) {
+        // پرداخت سود کامل یک ماه
+        investorProfit = (investor.profitRate / 100) * investor.investmentAmount;
+        description = `پرداخت ${investor.profitRate}٪ سود ماهیانه از اصل سرمایه ${formatCurrency(investor.investmentAmount)}`;
+      } else {
+        // پرداخت سود تا امروز (روزانه)
+        const accrued = calculateAccruedProfit(investor);
+        investorProfit = accrued.profit;
+        description = `پرداخت سود ${toPersianDigits(accrued.days)} روز (${investor.profitRate}٪ ماهیانه) از اصل سرمایه ${formatCurrency(investor.investmentAmount)}`;
+      }
+      
+      // ثبت تراکنش
+      await investorTransactionsStore.add({
+        investorId: investor.id,
+        type: 'profit_payment',
+        amount: investorProfit,
+        description,
+      });
+      
+      // آپدیت کل سود دریافتی
+      await investorsStore.update(investor.id, {
+        totalProfit: investor.totalProfit + investorProfit,
+      });
+
+      toast({
+        title: "موفق",
+        description: `سود ${formatCurrency(investorProfit)} به ${investor.name} پرداخت شد`,
+      });
+
+      setPaymentConfirmDialog({ open: false, investor: null, isFullMonth: true });
+      await loadData();
+    } catch (error) {
+      console.error('Error paying profit:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در پرداخت سود",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -124,36 +266,64 @@ const Investors = () => {
     }
 
     try {
-      await investorsStore.add({
-        name: formData.name,
-        phone: formData.phone,
-        nationalId: formData.nationalId,
-        investmentAmount,
-        profitRate,
-        startDate: startDate.toISOString().split('T')[0],
-        status: 'active',
-      });
+      if (editingInvestor) {
+        // ویرایش سرمایه‌گذار
+        const updateData = {
+          name: formData.name,
+          phone: formData.phone,
+          nationalId: formData.nationalId,
+          profitRate: profitRate,
+          startDate: startDate.toISOString().split('T')[0],
+        };
+        
+        console.log('Updating investor:', editingInvestor.id, updateData);
+        const updatedInvestor = await investorsStore.update(editingInvestor.id, updateData);
+        console.log('Updated investor received:', updatedInvestor);
 
-      toast({
-        title: "موفق",
-        description: "سرمایه‌گذار با موفقیت ثبت شد",
-      });
+        toast({
+          title: "موفق",
+          description: "سرمایه‌گذار با موفقیت ویرایش شد",
+        });
+      } else {
+        // ثبت سرمایه‌گذار جدید
+        await investorsStore.add({
+          name: formData.name,
+          phone: formData.phone,
+          nationalId: formData.nationalId,
+          investmentAmount,
+          profitRate,
+          startDate: startDate.toISOString().split('T')[0],
+          status: 'active',
+        });
 
+        toast({
+          title: "موفق",
+          description: "سرمایه‌گذار با موفقیت ثبت شد",
+        });
+      }
+
+      // Reset form
       setFormData({
         name: "",
         phone: "",
         nationalId: "",
         investmentAmount: "",
-        profitRate: "4",
+        profitRate: "3.5",
       });
       setStartDate(new Date());
+      setEditingInvestor(null);
       setIsDialogOpen(false);
+      
+      // Force reload data
       await loadData();
+      
+      // Force re-render by updating a dummy state if needed
+      console.log('Data reloaded after update');
     } catch (error) {
-      console.error('Error creating investor:', error);
+      console.error('Error saving investor:', error);
       toast({
         title: "خطا",
-        description: "خطا در ثبت سرمایه‌گذار",
+        description: editingInvestor ? "خطا در ویرایش سرمایه‌گذار" : "خطا در ثبت سرمایه‌گذار",
         variant: "destructive",
       });
     }
@@ -272,21 +442,44 @@ const Investors = () => {
               مدیریت سرمایه‌گذاران
             </h1>
             <p className="text-muted-foreground/80 text-sm md:text-base">
-              سرمایه‌گذارانی که ۴٪ سود از سودهای ماهانه دریافت می‌کنند
+              سرمایه‌گذارانی که ماهیانه سود از اصل سرمایه دریافت می‌کنند
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2 hover:scale-105 transition-all duration-200">
-                <Plus className="h-4 w-4" />
-                افزودن سرمایه‌گذار
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
+                setEditingInvestor(null);
+                setFormData({
+                  name: "",
+                  phone: "",
+                  nationalId: "",
+                  investmentAmount: "",
+                  profitRate: "3.5",
+                });
+                setStartDate(new Date());
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button className="gap-2 hover:scale-105 transition-all duration-200">
+                  <Plus className="h-4 w-4" />
+                  افزودن سرمایه‌گذار
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent flex items-center gap-2">
-                  <Plus className="h-5 w-5 text-primary" />
-                  افزودن سرمایه‌گذار جدید
+                  {editingInvestor ? (
+                    <>
+                      <Edit className="h-5 w-5 text-secondary" />
+                      ویرایش سرمایه‌گذار
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-5 w-5 text-primary" />
+                      افزودن سرمایه‌گذار جدید
+                    </>
+                  )}
                 </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -366,23 +559,34 @@ const Investors = () => {
                         required
                         dir="ltr"
                         className="text-lg font-semibold"
+                        disabled={!!editingInvestor}
                       />
+                      {editingInvestor && (
+                        <p className="text-xs text-muted-foreground">
+                          برای تغییر سرمایه از دکمه‌های "افزودن" یا "برداشت" استفاده کنید
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="profitRate" className="text-sm font-semibold flex items-center gap-2">
                         <Percent className="h-4 w-4" />
-                        درصد سود
+                        درصد سود ماهیانه
                       </Label>
                       <Input
                         id="profitRate"
                         type="number"
                         step="0.1"
+                        min="0"
+                        max="100"
                         value={formData.profitRate}
                         onChange={(e) => setFormData({ ...formData, profitRate: e.target.value })}
                         required
-                        placeholder="پیش‌فرض: ۴٪"
+                        placeholder="مثال: ۳.۵"
                         className="text-lg font-semibold"
                       />
+                      <p className="text-xs text-muted-foreground">
+                        درصد سود ماهیانه از اصل سرمایه
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="startDate" className="text-sm font-semibold flex items-center gap-2">
@@ -404,11 +608,12 @@ const Investors = () => {
                   className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary via-secondary to-primary hover:opacity-90 transition-all duration-200 shadow-lg hover:shadow-xl"
                 >
                   <CheckCircle2 className="h-4 w-4 ml-2" />
-                  ثبت سرمایه‌گذار
+                  {editingInvestor ? 'ذخیره تغییرات' : 'ثبت سرمایه‌گذار'}
                 </Button>
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -485,7 +690,7 @@ const Investors = () => {
             const profitTransactions = investorTransactions.filter(t => t.type === 'profit_payment');
             
             return (
-              <Card key={investor.id} className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.01] transition-all duration-300 group">
+              <Card key={`${investor.id}-${investor.startDate}`} className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.01] transition-all duration-300 group">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <CardHeader className="relative z-10">
                   <div className="flex justify-between items-start">
@@ -504,6 +709,40 @@ const Investors = () => {
                       >
                         {investor.status === 'active' ? 'فعال' : 'غیرفعال'}
                       </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => showPaymentConfirm(investor, true)}
+                        disabled={!isPaymentDue(investor)}
+                        className={cn(
+                          "gap-1 hover:scale-105 transition-all duration-200",
+                          isPaymentDue(investor)
+                            ? "text-success hover:bg-success/10 hover:border-success/50 border-success/30"
+                            : "opacity-50 cursor-not-allowed"
+                        )}
+                      >
+                        <TrendingUp className="h-3 w-3" />
+                        سود ماهیانه
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => showPaymentConfirm(investor, false)}
+                        disabled={calculateAccruedProfit(investor).days < 1}
+                        className="gap-1 text-warning hover:bg-warning/10 hover:border-warning/50 hover:scale-105 transition-all duration-200"
+                      >
+                        <DollarSign className="h-3 w-3" />
+                        سود تا امروز
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(investor)}
+                        className="gap-1 text-secondary hover:bg-secondary/10 hover:border-secondary/50 hover:scale-105 transition-all duration-200"
+                      >
+                        <Edit className="h-3 w-3" />
+                        ویرایش
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -553,19 +792,47 @@ const Investors = () => {
                       <div className="font-bold text-foreground">{toJalaliDate(investor.startDate)}</div>
                     </div>
                   </div>
-                  <div className="mt-4 pt-4 border-t border-border/50 flex justify-between items-center">
-                    <div className="text-sm text-muted-foreground/70">
-                      {toPersianDigits(profitTransactions.length)} پرداخت سود
+                  
+                  {/* سود روزانه و سود تا امروز */}
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-lg bg-gradient-to-br from-secondary/10 to-secondary/5 border border-secondary/20">
+                      <div className="text-xs text-muted-foreground mb-1">سود روزانه</div>
+                      <div className="font-bold text-secondary">{formatCurrency(calculateDailyProfit(investor))}</div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDetailsDialog({ open: true, investorId: investor.id })}
-                      className="gap-2 hover:bg-primary/10 hover:border-primary/50 hover:scale-105 transition-all duration-200"
-                    >
-                      <Eye className="h-3 w-3" />
-                      جزئیات
-                    </Button>
+                    <div className="p-3 rounded-lg bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20">
+                      <div className="text-xs text-muted-foreground mb-1">
+                        سود تا امروز ({toPersianDigits(calculateAccruedProfit(investor).days)} روز)
+                      </div>
+                      <div className="font-bold text-warning">{formatCurrency(calculateAccruedProfit(investor).profit)}</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-border/50">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="text-sm text-muted-foreground/70">
+                        {toPersianDigits(profitTransactions.length)} پرداخت سود
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDetailsDialog({ open: true, investorId: investor.id })}
+                        className="gap-2 hover:bg-primary/10 hover:border-primary/50 hover:scale-105 transition-all duration-200"
+                      >
+                        <Eye className="h-3 w-3" />
+                        جزئیات
+                      </Button>
+                    </div>
+                    {!isPaymentDue(investor) && (
+                      <div className="text-xs text-muted-foreground/60 flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        پرداخت بعدی: {toJalaliDate(getNextPaymentDate(investor).toISOString())}
+                      </div>
+                    )}
+                    {isPaymentDue(investor) && (
+                      <div className="text-xs text-success flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        زمان پرداخت سود رسیده است
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -716,7 +983,7 @@ const Investors = () => {
                       <CardContent className="relative z-10 space-y-3">
                         <div className="p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
                           <div className="text-xs text-muted-foreground mb-1">درصد سود</div>
-                          <div className="text-lg font-bold text-primary">{toPersianDigits(investor.profitRate.toString())}%</div>
+                          <div className="text-lg font-bold text-primary">{toPersianDigits(investor.profitRate.toString())}٪</div>
                         </div>
                         <div className="p-3 rounded-lg border border-border/50 hover:bg-accent/30 transition-colors">
                           <div className="text-xs text-muted-foreground mb-1">میانگین پرداخت</div>
@@ -922,6 +1189,133 @@ const Investors = () => {
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog تایید پرداخت سود */}
+        <Dialog open={paymentConfirmDialog.open} onOpenChange={(open) => setPaymentConfirmDialog({ ...paymentConfirmDialog, open })}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-success via-primary to-success bg-clip-text text-transparent flex items-center gap-2">
+                <CheckCircle2 className="h-6 w-6 text-success" />
+                تایید پرداخت سود
+              </DialogTitle>
+            </DialogHeader>
+            {paymentConfirmDialog.investor && (
+              <div className="space-y-4">
+                {/* اطلاعات سرمایه‌گذار */}
+                <Card className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/30">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 rounded-full bg-primary/20">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-lg">{paymentConfirmDialog.investor.name}</div>
+                        <div className="text-sm text-muted-foreground">سرمایه‌گذار</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">سرمایه:</span>
+                        <span className="font-semibold mr-2">{formatCurrency(paymentConfirmDialog.investor.investmentAmount)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">درصد سود:</span>
+                        <span className="font-semibold mr-2">{toPersianDigits(paymentConfirmDialog.investor.profitRate.toString())}٪</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* جزئیات پرداخت */}
+                <Card className="relative overflow-hidden bg-gradient-to-br from-success/10 via-success/5 to-transparent border-success/30">
+                  <CardContent className="p-4">
+                    <div className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-success" />
+                      جزئیات پرداخت
+                    </div>
+                    {paymentConfirmDialog.isFullMonth ? (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center p-2 rounded-lg bg-muted/50">
+                          <span className="text-sm text-muted-foreground">نوع پرداخت:</span>
+                          <span className="font-semibold">سود ماهیانه کامل</span>
+                        </div>
+                        <div className="flex justify-between items-center p-2 rounded-lg bg-muted/50">
+                          <span className="text-sm text-muted-foreground">محاسبه:</span>
+                          <span className="font-semibold text-sm">
+                            {formatCurrency(paymentConfirmDialog.investor.investmentAmount)} × {toPersianDigits(paymentConfirmDialog.investor.profitRate.toString())}٪
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 rounded-lg bg-success/20 border border-success/30 mt-3">
+                          <span className="font-semibold">مبلغ قابل پرداخت:</span>
+                          <span className="text-xl font-bold text-success">
+                            {formatCurrency((paymentConfirmDialog.investor.profitRate / 100) * paymentConfirmDialog.investor.investmentAmount)}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center p-2 rounded-lg bg-muted/50">
+                          <span className="text-sm text-muted-foreground">نوع پرداخت:</span>
+                          <span className="font-semibold">سود تا امروز (روزانه)</span>
+                        </div>
+                        <div className="flex justify-between items-center p-2 rounded-lg bg-muted/50">
+                          <span className="text-sm text-muted-foreground">تعداد روزها:</span>
+                          <span className="font-semibold">{toPersianDigits(calculateAccruedProfit(paymentConfirmDialog.investor).days)} روز</span>
+                        </div>
+                        <div className="flex justify-between items-center p-2 rounded-lg bg-muted/50">
+                          <span className="text-sm text-muted-foreground">سود روزانه:</span>
+                          <span className="font-semibold text-sm">{formatCurrency(calculateDailyProfit(paymentConfirmDialog.investor))}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 rounded-lg bg-warning/20 border border-warning/30 mt-3">
+                          <span className="font-semibold">مبلغ قابل پرداخت:</span>
+                          <span className="text-xl font-bold text-warning">
+                            {formatCurrency(calculateAccruedProfit(paymentConfirmDialog.investor).profit)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* هشدار */}
+                <Card className="relative overflow-hidden bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent border-blue-500/30">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-muted-foreground">
+                        <p className="font-semibold text-blue-500 mb-1">توجه:</p>
+                        <p>این مبلغ به حساب سرمایه‌گذار پرداخت و از سود خالص کسر می‌شود.</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* دکمه‌ها */}
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setPaymentConfirmDialog({ open: false, investor: null, isFullMonth: true })}
+                    className="flex-1 h-11"
+                  >
+                    انصراف
+                  </Button>
+                  <Button
+                    onClick={confirmPayProfit}
+                    className={cn(
+                      "flex-1 h-11 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200",
+                      paymentConfirmDialog.isFullMonth
+                        ? "bg-gradient-to-r from-success via-primary to-success hover:opacity-90"
+                        : "bg-gradient-to-r from-warning via-orange-500 to-warning hover:opacity-90"
+                    )}
+                  >
+                    <CheckCircle2 className="h-4 w-4 ml-2" />
+                    تایید و پرداخت
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 

@@ -43,6 +43,11 @@ class PhoneBase(BaseModel):
 class PhoneCreate(PhoneBase):
     status: Literal['available', 'sold'] = 'available'
     purchase_date: str = Field(..., alias='purchaseDate')
+    color: Optional[str] = None
+    storage: Optional[str] = None
+    condition: str = 'new'
+    purchase_source: Optional[str] = Field(None, alias='purchaseSource')
+    notes: Optional[str] = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -54,6 +59,11 @@ class PhoneUpdate(BaseModel):
     selling_price: Optional[float] = Field(None, alias='sellingPrice')
     status: Optional[Literal['available', 'sold']] = None
     purchase_date: Optional[str] = Field(None, alias='purchaseDate')
+    color: Optional[str] = None
+    storage: Optional[str] = None
+    condition: Optional[str] = None
+    purchase_source: Optional[str] = Field(None, alias='purchaseSource')
+    notes: Optional[str] = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -61,6 +71,11 @@ class Phone(PhoneBase):
     id: str
     status: str
     purchase_date: str = Field(..., alias='purchaseDate')
+    color: Optional[str] = None
+    storage: Optional[str] = None
+    condition: str = 'new'
+    purchase_source: Optional[str] = Field(None, alias='purchaseSource')
+    notes: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -189,6 +204,7 @@ class InvestorUpdate(BaseModel):
     investment_amount: Optional[float] = Field(None, alias='investmentAmount')
     profit_rate: Optional[float] = Field(None, alias='profitRate')
     total_profit: Optional[float] = Field(None, alias='totalProfit')
+    start_date: Optional[str] = Field(None, alias='startDate')
     status: Optional[Literal['active', 'inactive']] = None
 
     model_config = ConfigDict(populate_by_name=True)
@@ -229,6 +245,20 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    role: Literal['admin', 'partner'] = 'partner'
+    partner_id: Optional[str] = Field(None, alias='partnerId')
+
+    model_config = ConfigDict(populate_by_name=True)
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = Field(None, alias='fullName')
+    mobile: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[Literal['admin', 'partner']] = None
+    partner_id: Optional[str] = Field(None, alias='partnerId')
+    is_active: Optional[bool] = Field(None, alias='isActive')
+
+    model_config = ConfigDict(populate_by_name=True)
 
 class UserLogin(BaseModel):
     mobile: str
@@ -236,6 +266,9 @@ class UserLogin(BaseModel):
 
 class User(UserBase):
     id: str
+    role: str
+    partner_id: Optional[str] = Field(None, alias='partnerId')
+    is_active: bool = Field(..., alias='isActive')
     created_at: str = Field(..., alias='createdAt')
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)

@@ -8,55 +8,15 @@ export interface User {
   id: string;
   fullName: string;
   mobile: string;
+  role: 'admin' | 'partner';
+  partnerId?: string;
+  isActive: boolean;
   createdAt: string;
 }
 
 const STORAGE_KEY = 'auth_user';
 
-/**
- * ثبت‌نام کاربر جدید
- */
-export async function register(
-  fullName: string,
-  mobile: string,
-  password: string
-): Promise<{ success: boolean; message: string; user?: User }> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        fullName,
-        mobile,
-        password,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      return { 
-        success: false, 
-        message: error.detail || 'خطا در ثبت‌نام' 
-      };
-    }
-
-    const user: User = await response.json();
-
-    // ذخیره اطلاعات کاربر در localStorage
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-
-    return { 
-      success: true, 
-      message: 'ثبت‌نام با موفقیت انجام شد', 
-      user 
-    };
-  } catch (error) {
-    console.error('خطا در ثبت‌نام:', error);
-    return { success: false, message: 'خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید' };
-  }
-}
+// Register function removed - only admin can create users
 
 /**
  * ورود کاربر

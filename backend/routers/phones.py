@@ -26,12 +26,15 @@ def create_phone(phone: PhoneCreate):
             raise HTTPException(status_code=400, detail=f"گوشی با IMEI {phone.imei} قبلاً ثبت شده است")
         
         phone_id = str(uuid.uuid4())
-        purchase_date = datetime.now().isoformat()
+        purchase_date = phone.purchase_date if phone.purchase_date else datetime.now().isoformat()
         
         cursor.execute("""
-            INSERT INTO phones (id, brand, model, imei, purchase_price, selling_price, status, purchase_date)
-            VALUES (?, ?, ?, ?, ?, ?, 'available', ?)
-        """, (phone_id, phone.brand, phone.model, phone.imei, phone.purchase_price, phone.selling_price, purchase_date))
+            INSERT INTO phones (id, brand, model, imei, purchase_price, selling_price, status, purchase_date, 
+                              color, storage, condition, purchase_source, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (phone_id, phone.brand, phone.model, phone.imei, phone.purchase_price, phone.selling_price, 
+              phone.status, purchase_date, phone.color, phone.storage, phone.condition, 
+              phone.purchase_source, phone.notes))
         
         cursor.execute("SELECT * FROM phones WHERE id = ?", (phone_id,))
         return dict(cursor.fetchone())

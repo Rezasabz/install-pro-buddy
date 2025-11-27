@@ -96,7 +96,7 @@ const Dashboard = () => {
 
   const fetchDashboardStats = useCallback(async () => {
     try {
-      const [allSales, customers, allInstallments, allTransactions, allPartners, allExpenses, allPhones] = await Promise.all([
+      const [allSales, customers, allInstallments, allTransactions, allPartners, allExpenses, allPhones, allInvestors, allInvestorTransactions] = await Promise.all([
         salesStore.getAll(),
         customersStore.getAll(),
         installmentsStore.getAll(),
@@ -104,6 +104,22 @@ const Dashboard = () => {
         partnersStore.getAll(),
         expensesStore.getAll(),
         phonesStore.getAll(),
+        (async () => {
+          try {
+            const { investorsStore } = await import('@/lib/storeProvider');
+            return await investorsStore.getAll();
+          } catch {
+            return [];
+          }
+        })(),
+        (async () => {
+          try {
+            const { investorTransactionsStore } = await import('@/lib/storeProvider');
+            return await investorTransactionsStore.getAll();
+          } catch {
+            return [];
+          }
+        })(),
       ]);
 
       setTransactions(allTransactions);
@@ -120,14 +136,24 @@ const Dashboard = () => {
 
       const financials = calculateFinancialsFromData(allPartners, allSales, allInstallments);
       const totalExpenses = allExpenses.reduce((sum, e) => sum + e.amount, 0);
-      const netProfit = financials.totalProfit - totalExpenses;
+      
+      // محاسبه سرمایه سرمایه‌گذاران
+      const investorsCapital = allInvestors.reduce((sum, inv) => sum + inv.investmentAmount, 0);
+      
+      // محاسبه سود پرداختی به سرمایه‌گذاران
+      const investorsProfitPaid = allInvestorTransactions
+        .filter(t => t.type === 'profit_payment')
+        .reduce((sum, t) => sum + t.amount, 0);
+      
+      // سود خالص = سود کل - هزینه‌ها - سود پرداختی به سرمایه‌گذاران
+      const netProfit = financials.totalProfit - totalExpenses - investorsProfitPaid;
 
       setStats({
         totalRevenue,
         totalSales: allSales.length,
         activeCustomers: customers.length,
         pendingInstallments,
-        totalCapital: financials.totalCapital,
+        totalCapital: financials.totalCapital + investorsCapital, // سرمایه کل شامل سرمایه سرمایه‌گذاران
         availableCapital: financials.totalAvailableCapital,
         usedCapital: financials.totalUsedCapital,
         initialProfit: financials.totalInitialProfit,
@@ -823,21 +849,7 @@ const Dashboard = () => {
                 انصراف
               </AlertDialogCancel>
               <AlertDialogAction
-                onClick={async () => {
-                  setClearDataDialog(false);
-                  toast({
-                    title: "در حال پاک کردن...",
-                    description: "لطفاً صبر کنید",
-                  });
-                  const success = await clearAllData();
-                  if (!success) {
-                    toast({
-                      title: "خطا",
-                      description: "خطا در پاک کردن داده‌ها",
-                      variant: "destructive",
-                    });
-                  }
-                }}
+                onClick={handleClearAllData}
                 className="h-11 text-base font-semibold flex-1 bg-gradient-to-r from-destructive via-red-600 to-orange-600 hover:from-destructive/90 hover:via-red-500 hover:to-orange-500 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
               >
                 <Trash2 className="h-4 w-4 ml-2" />
@@ -847,11 +859,10 @@ const Dashboard = () => {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+      {/* Deleting Overlay */}
+      <DeletingOverlay isVisible={isDeleting} />
     </Layout>
   );
 };
 
 export default Dashboard;
-
-      {/* Deleting Overlay */}
-      <DeletingOverlay isVisible={isDeleting} />

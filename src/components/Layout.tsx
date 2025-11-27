@@ -33,16 +33,22 @@ const Layout = ({ children }: LayoutProps) => {
     logout();
   };
 
-  const navigation = [
-    { name: "داشبورد", href: "/", icon: LayoutDashboard },
-    { name: "شرکا", href: "/partners", icon: Users },
-    { name: "سرمایه‌گذاران", href: "/investors", icon: DollarSign },
-    { name: "موجودی", href: "/inventory", icon: Smartphone },
-    { name: "فروش", href: "/sales", icon: ShoppingCart },
-    { name: "مشتریان", href: "/customers", icon: Users },
-    { name: "اقساط", href: "/installments", icon: DollarSign },
-    { name: "هزینه‌ها", href: "/expenses", icon: Receipt },
+  const baseNavigation = [
+    { name: "داشبورد", href: "/", icon: LayoutDashboard, adminOnly: false },
+    { name: "شرکا", href: "/partners", icon: Users, adminOnly: true },
+    { name: "سرمایه‌گذاران", href: "/investors", icon: DollarSign, adminOnly: true },
+    { name: "موجودی", href: "/inventory", icon: Smartphone, adminOnly: true },
+    { name: "فروش", href: "/sales", icon: ShoppingCart, adminOnly: true },
+    { name: "مشتریان", href: "/customers", icon: Users, adminOnly: true },
+    { name: "اقساط", href: "/installments", icon: DollarSign, adminOnly: true },
+    { name: "هزینه‌ها", href: "/expenses", icon: Receipt, adminOnly: true },
+    { name: "کاربران", href: "/users", icon: UserIcon, adminOnly: true },
   ];
+
+  // Filter navigation based on user role
+  const navigation = baseNavigation.filter(item => 
+    !item.adminOnly || user?.role === 'admin'
+  );
 
   const isActive = (href: string) => {
     if (href === "/") {

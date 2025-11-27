@@ -154,8 +154,8 @@ const Sales = () => {
 
       if (announcedPrice > 0 && downPayment < announcedPrice && installmentMonths >= 2) {
         const remainingDebt = announcedPrice - downPayment;
-        const customRate = formData.profitCalculationType === 'custom_annual' 
-          ? parseFloat(formData.customProfitRate) || 8 
+        const customRate = (formData.profitCalculationType === 'fixed_4_percent' || formData.profitCalculationType === 'custom_annual')
+          ? parseFloat(formData.customProfitRate) || (formData.profitCalculationType === 'fixed_4_percent' ? 4 : 8)
           : undefined;
         
         const result = calculateProfit(
@@ -323,7 +323,21 @@ const Sales = () => {
       return;
     }
 
-    // اعتبارسنجی سود دلخواه
+    // اعتبارسنجی درصد سود
+    if (formData.profitCalculationType === 'fixed_4_percent') {
+      const customRate = parseFloat(formData.customProfitRate);
+      if (isNaN(customRate) || customRate < 1) {
+        setIsLoading(false);
+        setLoadingMessage("");
+        toast({
+          title: "خطا",
+          description: "درصد سود باید حداقل ۱٪ باشد",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     if (formData.profitCalculationType === 'custom_annual') {
       const customRate = parseFloat(formData.customProfitRate);
       if (isNaN(customRate) || customRate < 8) {
@@ -340,7 +354,7 @@ const Sales = () => {
 
     try {
       const remainingDebt = announcedPrice - downPayment;
-      const customRate = formData.profitCalculationType === 'custom_annual' 
+      const customRate = (formData.profitCalculationType === 'fixed_4_percent' || formData.profitCalculationType === 'custom_annual')
         ? parseFloat(formData.customProfitRate) 
         : undefined;
       
@@ -602,10 +616,10 @@ const Sales = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="fixed_4_percent">
-                        سود ثابت ۴٪ (یک‌بار)
+                        سود مانده هر ماه
                       </SelectItem>
                       <SelectItem value="monthly_4_percent_lda">
-                        سود ماهیانه ۴٪ روی باقیمانده (LDA)
+                        سود ماهیانه ۴٪
                       </SelectItem>
                       <SelectItem value="custom_annual">
                         سود دلخواه (حداقل ۸٪)
@@ -614,22 +628,28 @@ const Sales = () => {
                   </Select>
                 </div>
 
-                {formData.profitCalculationType === 'custom_annual' && (
+                {(formData.profitCalculationType === 'fixed_4_percent' || formData.profitCalculationType === 'custom_annual') && (
                   <div>
-                    <Label htmlFor="customProfitRate">درصد سود (حداقل ۸٪)</Label>
+                    <Label htmlFor="customProfitRate">
+                      {formData.profitCalculationType === 'fixed_4_percent' 
+                        ? 'درصد سود ماهیانه (پیش‌فرض: ۴٪)' 
+                        : 'درصد سود (حداقل ۸٪)'}
+                    </Label>
                     <Input
                       id="customProfitRate"
                       type="number"
-                      min="8"
+                      min={formData.profitCalculationType === 'fixed_4_percent' ? '1' : '8'}
                       step="0.5"
                       value={formData.customProfitRate}
                       onChange={(e) =>
                         setFormData({ ...formData, customProfitRate: e.target.value })
                       }
-                      placeholder="مثال: ۱۰"
+                      placeholder={formData.profitCalculationType === 'fixed_4_percent' ? 'مثال: ۴' : 'مثال: ۱۰'}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      سود روی کل مبلغ باقیمانده محاسبه می‌شود
+                      {formData.profitCalculationType === 'fixed_4_percent'
+                        ? 'درصد سود روی مانده بدهی هر ماه محاسبه می‌شود'
+                        : 'سود روی کل مبلغ باقیمانده محاسبه می‌شود'}
                     </p>
                   </div>
                 )}
@@ -643,7 +663,7 @@ const Sales = () => {
                         <span className="text-muted-foreground">نوع محاسبه:</span>
                         <span className="font-semibold text-primary">
                           {getProfitCalculationLabel(formData.profitCalculationType)}
-                          {formData.profitCalculationType === 'custom_annual' && 
+                          {(formData.profitCalculationType === 'fixed_4_percent' || formData.profitCalculationType === 'custom_annual') && 
                             ` (${toPersianDigits(formData.customProfitRate)}٪)`
                           }
                         </span>

@@ -142,7 +142,7 @@ async function calculateFinancialsOld(): Promise<FinancialSummary> {
 export function calculateFinancialsFromData(
   partners: any[],
   sales: any[],
-  allInstallments: any[]
+  allInstallments: unknown[]
 ): FinancialSummary {
   // محاسبه سرمایه کل
   const totalCapital = partners.reduce((sum, p) => sum + p.capital, 0);
@@ -280,30 +280,40 @@ export async function addMonthlyProfitToPartners(profitAmount: number): Promise<
 }
 
 /**
- * پرداخت سود به سرمایه‌گذاران (۴٪ از سود ماهانه)
+ * پرداخت سود به سرمایه‌گذاران (درصد مشخص شده از سود خالص)
+ * @param netProfit سود خالص (سود کل - هزینه‌ها)
+ * @returns مجموع سود پرداختی به سرمایه‌گذاران
  */
-export async function payInvestorsProfit(monthlyProfit: number): Promise<void> {
+export async function payInvestorsProfit(netProfit: number): Promise<number> {
   const { investorsStore, investorTransactionsStore } = await import('./storeProvider');
   
   const investors = await investorsStore.getAll();
   const activeInvestors = investors.filter(i => i.status === 'active');
   
+  let totalPaidToInvestors = 0;
+  
   for (const investor of activeInvestors) {
-    // محاسبه سود سرمایه‌گذار (درصد سود × سود ماهانه)
-    const investorProfit = (investor.profitRate / 100) * monthlyProfit;
+    // محاسبه سود سرمایه‌گذار (درصد سود × سود خالص)
+    const investorProfit = (investor.profitRate / 100) * netProfit;
     
-    // ثبت تراکنش
+    // ثبت تراکنش (حتی اگر منفی باشه)
     await investorTransactionsStore.add({
       investorId: investor.id,
       type: 'profit_payment',
       amount: investorProfit,
-      description: `پرداخت ${investor.profitRate}٪ سود از سود ماهانه ${monthlyProfit.toLocaleString('fa-IR')} تومان`,
+      description: investorProfit >= 0 
+        ? `پرداخت ${investor.profitRate}٪ سود از سود خالص ${netProfit.toLocaleString('fa-IR')} تومان`
+        : `بدهی ${investor.profitRate}٪ از ضرر خالص ${Math.abs(netProfit).toLocaleString('fa-IR')} تومان`,
       date: new Date().toISOString(),
     });
     
-    // آپدیت کل سود دریافتی
+    // آپدیت کل سود دریافتی (می‌تونه منفی بشه)
     await investorsStore.update(investor.id, {
       totalProfit: investor.totalProfit + investorProfit,
     });
+    
+    totalPaidToInvestors += investorProfit;
   }
+  
+  return totalPaidToInvestors;
 }

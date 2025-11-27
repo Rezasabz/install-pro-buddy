@@ -70,7 +70,9 @@ export function jalaliToGregorian(jYear: number, jMonth: number, jDay: number): 
   const gd = days - g_d_m[gm] + 1;
   gm++;
   
-  return new Date(gy, gm - 1, gd);
+  // استفاده از UTC برای جلوگیری از مشکلات timezone
+  const date = new Date(Date.UTC(gy, gm - 1, gd, 12, 0, 0));
+  return date;
 }
 
 // تبدیل Date به JalaliDate

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,11 +107,8 @@ export default function Login() {
               {isLoading ? "در حال ورود..." : "ورود"}
             </Button>
 
-            <div className="text-center text-sm">
-              <span className="text-muted-foreground">حساب کاربری ندارید؟ </span>
-              <Link to="/register" className="text-primary hover:underline">
-                ثبت‌نام
-              </Link>
+            <div className="text-center text-sm text-muted-foreground mt-4">
+              برای دریافت حساب کاربری با مدیر سیستم تماس بگیرید
             </div>
           </form>
         </CardContent>
