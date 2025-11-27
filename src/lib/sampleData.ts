@@ -110,8 +110,9 @@ export function loadSampleData() {
   return true;
 }
 
-export async function clearAllData() {
+export async function clearAllData(onProgress?: (step: number) => void) {
   try {
+    onProgress?.(0);
     // پاک کردن داده‌های API
     const { 
       partnersStore, 
@@ -125,60 +126,54 @@ export async function clearAllData() {
       investorTransactionsStore,
     } = await import('./storeProvider');
     
-    // حذف همه اقساط (اول باید پاک بشن چون foreign key دارن)
+    // Step 1: حذف اقساط و فروش‌ها
+    onProgress?.(1);
     const installments = await installmentsStore.getAll();
     for (const installment of installments) {
       await installmentsStore.delete(installment.id);
     }
     
-    // حذف همه فروش‌ها
     const sales = await salesStore.getAll();
     for (const sale of sales) {
       await salesStore.delete(sale.id);
     }
     
-    // حذف همه تراکنش‌های شرکا
+    // Step 2: حذف مشتریان و شرکا
+    onProgress?.(2);
     const transactions = await transactionsStore.getAll();
     for (const transaction of transactions) {
       await transactionsStore.delete(transaction.id);
     }
     
-    // حذف همه شرکا
     const partners = await partnersStore.getAll();
     for (const partner of partners) {
       await partnersStore.delete(partner.id);
     }
     
-    // حذف همه گوشی‌ها
     const phones = await phonesStore.getAll();
     for (const phone of phones) {
       await phonesStore.delete(phone.id);
     }
     
-    // حذف همه مشتریان
     const customers = await customersStore.getAll();
     for (const customer of customers) {
       await customersStore.delete(customer.id);
     }
     
-    // حذف همه هزینه‌ها
+    // Step 3: حذف هزینه‌ها و سرمایه‌گذاران
+    onProgress?.(3);
     const expenses = await expensesStore.getAll();
     for (const expense of expenses) {
       await expensesStore.delete(expense.id);
     }
     
-    // حذف همه تراکنش‌های سرمایه‌گذاران
-    const investorTransactions = await investorTransactionsStore.getAll();
-    for (const transaction of investorTransactions) {
-      // Note: backend doesn't have delete for investor transactions yet
-      // Will be handled by cascade delete when investor is deleted
-    }
-    
-    // حذف همه سرمایه‌گذاران
     const investors = await investorsStore.getAll();
     for (const investor of investors) {
       await investorsStore.delete(investor.id);
     }
+    
+    // Step 4: پاکسازی نهایی
+    onProgress?.(4);
     
     // پاک کردن localStorage (فقط داده‌های app، نه auth)
     const authUser = localStorage.getItem('auth_user');

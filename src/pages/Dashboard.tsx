@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Layout from "@/components/Layout";
 import { useDataContext } from "@/contexts/DataContext";
+import { DeletingOverlay } from "@/components/DeletingOverlay";
 import MetricCard from "@/components/MetricCard";
 import {
   DollarSign,
@@ -69,6 +70,7 @@ interface DashboardStats {
 
 const Dashboard = () => {
   const [clearDataDialog, setClearDataDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0,
     totalSales: 0,
@@ -145,6 +147,16 @@ const Dashboard = () => {
       setLoading(false);
     }
   }, [toast]);
+
+  const handleClearAllData = async () => {
+    setIsDeleting(true);
+    setClearDataDialog(false);
+    
+    const { clearAllData } = await import('@/lib/sampleData');
+    await clearAllData();
+    
+    // Redirect handled by clearAllData
+  };
 
   useEffect(() => {
     fetchDashboardStats();
@@ -840,3 +852,6 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+      {/* Deleting Overlay */}
+      <DeletingOverlay isVisible={isDeleting} />

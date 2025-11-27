@@ -423,3 +423,17 @@ All colors MUST be HSL.
     0 1px 0 rgba(255, 255, 255, 0.15) inset,
     0 0 60px rgba(251, 86, 7, 0.3);
 }
+/*
+ Shimmer animation for deleting overlay */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
