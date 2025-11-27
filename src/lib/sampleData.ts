@@ -112,9 +112,6 @@ export function loadSampleData() {
 
 export async function clearAllData() {
   try {
-    // پاک کردن localStorage (برای investors و داده‌های محلی)
-    localStorage.clear();
-    
     // پاک کردن داده‌های API
     const { 
       partnersStore, 
@@ -124,7 +121,27 @@ export async function clearAllData() {
       installmentsStore,
       transactionsStore,
       expensesStore,
+      investorsStore,
+      investorTransactionsStore,
     } = await import('./storeProvider');
+    
+    // حذف همه اقساط (اول باید پاک بشن چون foreign key دارن)
+    const installments = await installmentsStore.getAll();
+    for (const installment of installments) {
+      await installmentsStore.delete(installment.id);
+    }
+    
+    // حذف همه فروش‌ها
+    const sales = await salesStore.getAll();
+    for (const sale of sales) {
+      await salesStore.delete(sale.id);
+    }
+    
+    // حذف همه تراکنش‌های شرکا
+    const transactions = await transactionsStore.getAll();
+    for (const transaction of transactions) {
+      await transactionsStore.delete(transaction.id);
+    }
     
     // حذف همه شرکا
     const partners = await partnersStore.getAll();
@@ -144,32 +161,35 @@ export async function clearAllData() {
       await customersStore.delete(customer.id);
     }
     
-    // حذف همه فروش‌ها
-    const sales = await salesStore.getAll();
-    for (const sale of sales) {
-      await salesStore.delete(sale.id);
-    }
-    
-    // حذف همه اقساط
-    const installments = await installmentsStore.getAll();
-    for (const installment of installments) {
-      await installmentsStore.delete(installment.id);
-    }
-    
-    // حذف همه تراکنش‌ها
-    const transactions = await transactionsStore.getAll();
-    for (const transaction of transactions) {
-      await transactionsStore.delete(transaction.id);
-    }
-    
     // حذف همه هزینه‌ها
     const expenses = await expensesStore.getAll();
     for (const expense of expenses) {
       await expensesStore.delete(expense.id);
     }
     
-    // رفرش صفحه
-    window.location.reload();
+    // حذف همه تراکنش‌های سرمایه‌گذاران
+    const investorTransactions = await investorTransactionsStore.getAll();
+    for (const transaction of investorTransactions) {
+      // Note: backend doesn't have delete for investor transactions yet
+      // Will be handled by cascade delete when investor is deleted
+    }
+    
+    // حذف همه سرمایه‌گذاران
+    const investors = await investorsStore.getAll();
+    for (const investor of investors) {
+      await investorsStore.delete(investor.id);
+    }
+    
+    // پاک کردن localStorage (فقط داده‌های app، نه auth)
+    const authUser = localStorage.getItem('auth_user');
+    localStorage.clear();
+    
+    // Logout کاربر
+    const { logout } = await import('./auth');
+    logout();
+    
+    // رفرش صفحه و redirect به login
+    window.location.href = '/login';
     return true;
   } catch (error) {
     console.error('Error clearing data:', error);
