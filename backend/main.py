@@ -21,13 +21,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware - Allow all origins (for development/demo)
+# CORS middleware - Allow specific origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=False,  # Must be False when allow_origins is "*"
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://185.92.182.51",
+        "http://185.92.182.51:80",
+        "http://185.92.182.51:8000",
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include routers

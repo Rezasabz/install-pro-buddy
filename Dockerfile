@@ -14,7 +14,8 @@ RUN npm ci --only=production && \
 COPY . .
 
 # تنظیم environment variable برای build
-ARG VITE_API_URL=http://185.92.182.51:8000
+# استفاده از relative URL برای proxy از طریق nginx
+ARG VITE_API_URL=
 ENV VITE_API_URL=$VITE_API_URL
 
 # بیلد (حالا vite پیدا می‌شه)

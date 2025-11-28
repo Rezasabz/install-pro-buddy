@@ -1,6 +1,6 @@
 // API Store - connects to FastAPI backend
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Types
 export type ProfitCalculationType = 'fixed_4_percent' | 'monthly_4_percent_lda' | 'custom_annual';

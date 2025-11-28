@@ -2,7 +2,7 @@
  * سیستم احراز هویت - متصل به API
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://185.92.182.51:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export interface User {
   id: string;
