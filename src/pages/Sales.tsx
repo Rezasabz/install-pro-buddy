@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
+import { InvoiceDialog } from "@/components/InvoiceDialog";
 import { useDataContext } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +47,7 @@ import {
 } from "@/lib/storeProvider";
 import { calculateProfit, getProfitCalculationLabel } from "@/lib/profitCalculations";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
+import { addMonthsToDate } from "@/lib/jalali";
 import { 
   calculateInstallments, 
   checkCapitalAvailability,
@@ -67,6 +69,19 @@ const Sales = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; saleId: string }>({ open: false, saleId: '' });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; saleId: string; saleInfo: string }>({ open: false, saleId: '', saleInfo: '' });
+  const [invoiceDialog, setInvoiceDialog] = useState<{
+    open: boolean;
+    sale: Sale | null;
+    customer: Customer | null;
+    phone: Phone | null;
+    installments: Installment[];
+  }>({
+    open: false,
+    sale: null,
+    customer: null,
+    phone: null,
+    installments: [],
+  });
   const [formData, setFormData] = useState({
     customerId: "",
     phoneId: "", // گوشی از موجودی
@@ -112,6 +127,28 @@ const Sales = () => {
       toast({
         title: "خطا",
         description: "خطا در بارگذاری فروش‌ها",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleShowInvoice = (sale: Sale) => {
+    const customer = customers.find(c => c.id === sale.customerId);
+    const phone = phones.find(p => p.id === sale.phoneId);
+    const saleInstallments = installments.filter(i => i.saleId === sale.id);
+    
+    if (customer && phone) {
+      setInvoiceDialog({
+        open: true,
+        sale,
+        customer,
+        phone,
+        installments: saleInstallments,
+      });
+    } else {
+      toast({
+        title: "خطا",
+        description: "اطلاعات کامل برای نمایش فاکتور یافت نشد",
         variant: "destructive",
       });
     }
@@ -390,8 +427,8 @@ const Sales = () => {
       // ایجاد اقساط
       const today = new Date();
       for (const inst of profitResult.installments) {
-        const dueDate = new Date(today);
-        dueDate.setMonth(dueDate.getMonth() + inst.installmentNumber);
+        // استفاده از تابع addMonthsToDate برای محاسبه دقیق تاریخ با تقویم شمسی
+        const dueDate = addMonthsToDate(today, inst.installmentNumber);
         
         await installmentsStore.add({
           saleId: newSale.id,
@@ -809,6 +846,15 @@ const Sales = () => {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => handleShowInvoice(sale)}
+                        className="text-primary hover:text-primary hover:bg-primary/10 hover:scale-110 transition-all duration-200"
+                        title="مشاهده فاکتور"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleDeleteSale(sale.id)}
                         className="text-destructive hover:text-destructive hover:bg-destructive/10 hover:scale-110 transition-all duration-200"
                       >
@@ -1092,56 +1138,89 @@ const Sales = () => {
                       <div className="space-y-2">
                         {saleInstallments.map((inst, index) => {
                           const StatusIcon = inst.status === 'paid' ? CheckCircle2 : inst.status === 'overdue' ? AlertCircle : Clock;
-                          const statusColor = inst.status === 'paid' ? 'text-success' : inst.status === 'overdue' ? 'text-destructive' : 'text-warning';
                           
                           return (
                             <div 
                               key={inst.id} 
                               className={cn(
-                                "flex items-center justify-between p-4 rounded-lg border transition-all duration-200 hover:scale-[1.01]",
-                                inst.status === 'paid' && "bg-success/5 border-success/20",
-                                inst.status === 'overdue' && "bg-destructive/5 border-destructive/20",
-                                inst.status === 'pending' && "bg-warning/5 border-warning/20 hover:bg-warning/10"
+                                "group relative overflow-hidden rounded-xl border backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5",
+                                inst.status === 'paid' && "bg-gradient-to-br from-success/5 via-success/3 to-transparent border-success/20 hover:border-success/40",
+                                inst.status === 'overdue' && "bg-gradient-to-br from-destructive/5 via-destructive/3 to-transparent border-destructive/20 hover:border-destructive/40",
+                                inst.status === 'pending' && "bg-gradient-to-br from-warning/5 via-warning/3 to-transparent border-warning/20 hover:border-warning/40"
                               )}
-                              style={{ animationDelay: `${index * 30}ms` }}
+                              style={{ animationDelay: `${index * 50}ms` }}
                             >
-                              <div className="flex items-center gap-3 flex-1">
-                                <div className={cn("p-2 rounded-lg", inst.status === 'paid' ? "bg-success/10" : inst.status === 'overdue' ? "bg-destructive/10" : "bg-warning/10")}>
-                                  <StatusIcon className={cn("h-4 w-4", statusColor)} />
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-semibold">قسط {toPersianDigits(inst.installmentNumber)}</span>
-                                    <Badge 
-                                      variant="outline"
-                                      className={cn(
-                                        "text-xs",
-                                        inst.status === 'paid' && "bg-success/10 text-success border-success/20",
-                                        inst.status === 'overdue' && "bg-destructive/10 text-destructive border-destructive/20",
-                                        inst.status === 'pending' && "bg-warning/10 text-warning border-warning/20"
-                                      )}
-                                    >
-                                      {inst.status === 'paid' ? 'پرداخت شده' : inst.status === 'overdue' ? 'معوق' : 'در انتظار'}
-                                    </Badge>
+                              {/* Gradient overlay on hover */}
+                              <div className={cn(
+                                "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300",
+                                inst.status === 'paid' && "bg-gradient-to-r from-success/5 to-transparent",
+                                inst.status === 'overdue' && "bg-gradient-to-r from-destructive/5 to-transparent",
+                                inst.status === 'pending' && "bg-gradient-to-r from-warning/5 to-transparent"
+                              )} />
+                              
+                              <div className="relative flex items-center justify-between p-5">
+                                <div className="flex items-center gap-4 flex-1">
+                                  {/* Status Icon with glassmorphism */}
+                                  <div className={cn(
+                                    "relative p-3 rounded-xl backdrop-blur-md shadow-sm transition-all duration-300 group-hover:scale-110",
+                                    inst.status === 'paid' && "bg-success/10 shadow-success/20",
+                                    inst.status === 'overdue' && "bg-destructive/10 shadow-destructive/20",
+                                    inst.status === 'pending' && "bg-warning/10 shadow-warning/20"
+                                  )}>
+                                    <StatusIcon className={cn(
+                                      "h-5 w-5 transition-transform duration-300 group-hover:rotate-12",
+                                      inst.status === 'paid' && "text-success",
+                                      inst.status === 'overdue' && "text-destructive",
+                                      inst.status === 'pending' && "text-warning"
+                                    )} />
                                   </div>
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Calendar className="h-3 w-3" />
-                                    سررسید: {toJalaliDate(inst.dueDate)}
+                                  
+                                  <div className="flex-1 space-y-2">
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-lg font-bold bg-gradient-to-l from-foreground to-foreground/70 bg-clip-text">
+                                        قسط {toPersianDigits(inst.installmentNumber)}
+                                      </span>
+                                      <Badge 
+                                        variant="outline"
+                                        className={cn(
+                                          "text-xs font-semibold px-3 py-1 rounded-full backdrop-blur-sm transition-all duration-300",
+                                          inst.status === 'paid' && "bg-success/15 text-success border-success/30 shadow-success/10",
+                                          inst.status === 'overdue' && "bg-destructive/15 text-destructive border-destructive/30 shadow-destructive/10",
+                                          inst.status === 'pending' && "bg-warning/15 text-warning border-warning/30 shadow-warning/10"
+                                        )}
+                                      >
+                                        {inst.status === 'paid' ? '✓ پرداخت شده' : inst.status === 'overdue' ? '⚠ معوق' : '⏱ در انتظار'}
+                                      </Badge>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <Calendar className="h-3.5 w-3.5" />
+                                      <span>سررسید: {toJalaliDate(inst.dueDate)}</span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                              <div className="text-left space-y-1 min-w-[140px]">
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-muted-foreground">اصل:</span>
-                                  <span className="font-medium">{formatCurrency(inst.principalAmount)}</span>
-                                </div>
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-muted-foreground">سود:</span>
-                                  <span className="font-medium text-secondary">{formatCurrency(inst.interestAmount)}</span>
-                                </div>
-                                <div className="flex items-center justify-between pt-1 border-t border-border/50">
-                                  <span className="text-xs font-semibold text-muted-foreground">مجموع:</span>
-                                  <span className="font-bold text-primary">{formatCurrency(inst.totalAmount)}</span>
+                                
+                                {/* Amount section with modern card */}
+                                <div className="text-left">
+                                  <div className="bg-gradient-to-br from-primary/5 to-primary/10 backdrop-blur-sm rounded-xl p-4 border border-primary/10 shadow-sm min-w-[180px]">
+                                    <div className="flex items-baseline justify-between mb-3">
+                                      <span className="text-xs font-medium text-muted-foreground">مبلغ قسط</span>
+                                      <span className="text-2xl font-bold bg-gradient-to-l from-primary to-primary/70 bg-clip-text text-transparent">
+                                        {formatCurrency(inst.totalAmount)}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-primary/10">
+                                      <div className="flex items-center gap-1.5">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-foreground/40" />
+                                        <span className="text-xs text-muted-foreground">اصل:</span>
+                                        <span className="text-xs font-semibold">{formatCurrency(inst.principalAmount)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-secondary" />
+                                        <span className="text-xs text-muted-foreground">سود:</span>
+                                        <span className="text-xs font-semibold text-secondary">{formatCurrency(inst.interestAmount)}</span>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1155,6 +1234,18 @@ const Sales = () => {
             })()}
           </DialogContent>
         </Dialog>
+
+        {/* Invoice Dialog */}
+        {invoiceDialog.sale && invoiceDialog.customer && invoiceDialog.phone && (
+          <InvoiceDialog
+            open={invoiceDialog.open}
+            onOpenChange={(open) => setInvoiceDialog({ ...invoiceDialog, open })}
+            sale={invoiceDialog.sale}
+            customer={invoiceDialog.customer}
+            phone={invoiceDialog.phone}
+            installments={invoiceDialog.installments}
+          />
+        )}
 
         {/* AlertDialog حذف فروش */}
         <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>

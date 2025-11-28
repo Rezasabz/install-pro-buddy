@@ -64,13 +64,23 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-primary/10 rounded-full">
+            <img 
+              src="/logo.png" 
+              alt="Majid Mobile Logo" 
+              className="h-28 w-28 object-contain"
+              onError={(e) => {
+                // Fallback to icon if image not found
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
+            />
+            <div className="hidden p-3 bg-primary/10 rounded-full">
               <Smartphone className="h-8 w-8 text-primary" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">ورود به سیستم</CardTitle>
           <CardDescription>
-            با شماره موبایل و رمز عبور خود وارد شوید
+            مجید موبایل - سیستم مدیریت فروش اقساطی
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -82,7 +92,7 @@ export default function Login() {
                 type="tel"
                 value={formData.mobile}
                 onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                placeholder="مثال: ۰۹۱۲۳۴۵۶۷۸۹"
+                placeholder="مثال: 09381936400"
                 disabled={isLoading}
                 autoComplete="tel"
                 dir="ltr"

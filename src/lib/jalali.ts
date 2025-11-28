@@ -184,3 +184,15 @@ export function addMonthsToJalali(date: JalaliDate, months: number): JalaliDate 
   
   return { year: newYear, month: newMonth, day: newDay };
 }
+
+// اضافه کردن ماه به تاریخ میلادی با در نظر گرفتن تقویم شمسی
+export function addMonthsToDate(date: Date, months: number): Date {
+  // تبدیل به شمسی
+  const jalali = dateToJalali(date);
+  
+  // اضافه کردن ماه
+  const newJalali = addMonthsToJalali(jalali, months);
+  
+  // تبدیل به میلادی
+  return jalaliToGregorian(newJalali.year, newJalali.month, newJalali.day);
+}

@@ -64,12 +64,19 @@ const Layout = ({ children }: LayoutProps) => {
         <div className="flex h-16 items-center px-4 md:px-6 lg:px-8">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-lg blur-sm group-hover:blur-md transition-all duration-300" />
-              <Smartphone className="relative h-7 w-7 text-primary group-hover:scale-110 transition-transform duration-300" />
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="Majid Mobile Logo" 
+              className="h-12 w-12 object-contain group-hover:scale-110 transition-transform duration-300"
+              onError={(e) => {
+                // Fallback to icon if image not found
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
+            />
+            <Smartphone className="hidden h-7 w-7 text-primary group-hover:scale-110 transition-transform duration-300" />
             <span className="hidden sm:inline-block text-lg font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              مدیریت فروش موبایل
+              مجید موبایل
             </span>
           </Link>
           

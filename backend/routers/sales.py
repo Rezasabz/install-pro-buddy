@@ -2,9 +2,32 @@ from fastapi import APIRouter, HTTPException
 from typing import List
 import uuid
 from datetime import datetime
+import calendar
 
 from database import get_db
 from models import Sale, SaleCreate, SaleUpdate
+
+def add_months_to_date(date: datetime, months: int) -> datetime:
+    """Add months to a date properly handling month boundaries"""
+    year = date.year
+    month = date.month + months
+    day = date.day
+    
+    # Handle year overflow
+    while month > 12:
+        month -= 12
+        year += 1
+    
+    while month < 1:
+        month += 12
+        year -= 1
+    
+    # Handle day overflow (e.g., Jan 31 + 1 month should be Feb 28/29)
+    max_day = calendar.monthrange(year, month)[1]
+    if day > max_day:
+        day = max_day
+    
+    return datetime(year, month, day, date.hour, date.minute, date.second, date.microsecond)
 
 router = APIRouter()
 
