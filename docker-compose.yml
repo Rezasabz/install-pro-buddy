@@ -1,9 +1,10 @@
 services:
   # Backend Service (FastAPI)
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    # build:
+    #   context: ./backend
+    #   dockerfile: Dockerfile
+    image: rezasabz/install-pro-buddy-backend:latest
     container_name: installment-backend
     ports:
       - "8000:8000"
@@ -24,9 +25,10 @@ services:
 
   # Frontend Service (React + Vite)
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    image: rezasabz/install-pro-buddy-frontend:latest
     container_name: installment-frontend
     ports:
       - "80:80"
