@@ -37,10 +37,13 @@ import { Plus, Edit, Trash2, Smartphone, Package, DollarSign, Palette, HardDrive
 import { useToast } from "@/hooks/use-toast";
 import { JalaliDatePicker } from "@/components/JalaliDatePicker";
 import { cn } from "@/lib/utils";
-import { phoneBrands, getModelsByBrand } from "@/lib/phoneModels";
+import { phoneBrands, getAllModelsByBrand, addCustomModel } from "@/lib/phoneModels";
 
 const Inventory = () => {
   const [phones, setPhones] = useState<Phone[]>([]);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPhone, setEditingPhone] = useState<Phone | null>(null);
   const [detailsPhone, setDetailsPhone] = useState<Phone | null>(null);
@@ -81,6 +84,19 @@ const Inventory = () => {
     loadPhones();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // فیلتر کردن گوشی‌ها
+  const filteredPhones = phones.filter(phone => {
+    const matchesSearch = searchQuery === "" || 
+      phone.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      phone.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      phone.imei.includes(searchQuery) ||
+      (phone.color && phone.color.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesStatus = statusFilter === "all" || phone.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
 
   const handlePurchasePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -158,6 +174,16 @@ const Inventory = () => {
           description: "گوشی با موفقیت بروزرسانی شد",
         });
       } else {
+        // اگر مدل جدیده، به دیتابیس اضافه کن
+        if (!availableModels.includes(formData.model)) {
+          try {
+            await addCustomModel(formData.brand, formData.model);
+          } catch (error) {
+            console.error('Error adding custom model:', error);
+            // ادامه بده حتی اگر اضافه کردن مدل با خطا مواجه شد
+          }
+        }
+        
         await phonesStore.add({
           brand: formData.brand,
           model: formData.model,
@@ -319,8 +345,11 @@ const Inventory = () => {
                       </Label>
                       <Select
                         value={formData.brand}
-                        onValueChange={(value) => {
+                        onValueChange={async (value) => {
                           setFormData({ ...formData, brand: value, model: "" });
+                          // بارگذاری مدل‌ها
+                          const models = await getAllModelsByBrand(value);
+                          setAvailableModels(models);
                         }}
                         required
                       >
@@ -344,7 +373,7 @@ const Inventory = () => {
                       {formData.brand ? (
                         <>
                           <Select
-                            value={formData.model && getModelsByBrand(formData.brand).includes(formData.model) ? formData.model : "custom"}
+                            value={formData.model && availableModels.includes(formData.model) ? formData.model : "custom"}
                             onValueChange={(value) => {
                               if (value === "custom") {
                                 setFormData({ ...formData, model: "" });
@@ -358,7 +387,7 @@ const Inventory = () => {
                               <SelectValue placeholder="انتخاب مدل" />
                             </SelectTrigger>
                             <SelectContent>
-                              {getModelsByBrand(formData.brand).map((model) => (
+                              {availableModels.map((model) => (
                                 <SelectItem key={model} value={model}>
                                   {model}
                                 </SelectItem>
@@ -366,7 +395,7 @@ const Inventory = () => {
                               <SelectItem value="custom">سایر (ورود دستی)</SelectItem>
                             </SelectContent>
                           </Select>
-                          {(!formData.model || !getModelsByBrand(formData.brand).includes(formData.model)) && (
+                          {(!formData.model || !availableModels.includes(formData.model)) && (
                             <Input
                               id="model"
                               value={formData.model}
@@ -374,7 +403,7 @@ const Inventory = () => {
                                 setFormData({ ...formData, model: e.target.value })
                               }
                               required
-                              placeholder="نام مدل را وارد کنید"
+                              placeholder="نام مدل را وارد کنید (بعد از ثبت به لیست اضافه میشود)"
                               className="h-10 mt-2"
                             />
                           )}
@@ -693,9 +722,36 @@ const Inventory = () => {
           </Card>
         </div>
 
+        {/* جستجو و فیلتر */}
+        <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Package className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="جستجو بر اساس برند، مدل، IMEI یا رنگ..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pr-10"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="وضعیت" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">همه</SelectItem>
+                  <SelectItem value="available">موجود</SelectItem>
+                  <SelectItem value="sold">فروخته شده</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* کارت‌های موبایل با استایل مدرن 2025 */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {phones.map((phone, index) => {
+          {filteredPhones.map((phone, index) => {
             const profit = phone.sellingPrice - phone.purchasePrice;
             const profitPercent = ((profit / phone.purchasePrice) * 100).toFixed(1);
             
@@ -872,6 +928,19 @@ const Inventory = () => {
             );
           })}
         </div>
+
+        {filteredPhones.length === 0 && phones.length > 0 && (
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm">
+            <div className="absolute inset-0 bg-gradient-to-br from-warning/5 via-transparent to-warning/5" />
+            <CardContent className="relative flex flex-col items-center justify-center py-12">
+              <AlertCircle className="h-16 w-16 text-warning mb-4" />
+              <h3 className="text-xl font-semibold mb-2">نتیجه‌ای یافت نشد</h3>
+              <p className="text-muted-foreground text-center">
+                با فیلترهای انتخابی، گوشی‌ای پیدا نشد. لطفا جستجوی دیگری امتحان کنید.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {phones.length === 0 && (
           <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm">
@@ -1128,14 +1197,16 @@ const Inventory = () => {
                       <p className="text-sm font-semibold text-destructive">
                         هشدار مهم
                       </p>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        این عمل غیرقابل بازگشت است و تمام اطلاعات مرتبط با این گوشی از جمله:
-                      </p>
-                      <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside mr-4">
-                        <li>اطلاعات خرید و فروش</li>
-                        <li>IMEI و مشخصات فنی</li>
-                        <li>تاریخچه موجودی</li>
-                      </ul>
+                      <div className="text-sm text-muted-foreground leading-relaxed">
+                        <p className="mb-2">
+                          این عمل غیرقابل بازگشت است و تمام اطلاعات مرتبط با این گوشی از جمله:
+                        </p>
+                        <ul className="text-xs space-y-1 list-disc list-inside mr-4">
+                          <li>اطلاعات خرید و فروش</li>
+                          <li>IMEI و مشخصات فنی</li>
+                          <li>تاریخچه موجودی</li>
+                        </ul>
+                      </div>
                       <p className="text-sm font-semibold text-destructive mt-2">
                         برای همیشه حذف خواهند شد.
                       </p>

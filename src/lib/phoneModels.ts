@@ -187,3 +187,40 @@ export function getModelsByBrand(brand: string): string[] {
   return brandData?.models || [];
 }
 
+// دریافت مدل‌های سفارشی از API
+export async function getCustomModelsByBrand(brand: string): Promise<string[]> {
+  try {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+    const response = await fetch(`${API_BASE_URL}/api/phone-models/${encodeURIComponent(brand)}`);
+    if (!response.ok) return [];
+    return await response.json();
+  } catch (error) {
+    console.error('Error loading custom models:', error);
+    return [];
+  }
+}
+
+// دریافت همه مدل‌ها (پیش‌فرض + سفارشی)
+export async function getAllModelsByBrand(brand: string): Promise<string[]> {
+  const defaultModels = getModelsByBrand(brand);
+  const customModels = await getCustomModelsByBrand(brand);
+  
+  // ترکیب و حذف تکراری
+  return [...new Set([...defaultModels, ...customModels])];
+}
+
+// اضافه کردن مدل جدید به دیتابیس
+export async function addCustomModel(brand: string, model: string): Promise<void> {
+  try {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+    await fetch(`${API_BASE_URL}/api/phone-models`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brand, model }),
+    });
+  } catch (error) {
+    console.error('Error saving custom model:', error);
+    throw error;
+  }
+}
+

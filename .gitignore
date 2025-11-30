@@ -41,3 +41,11 @@ ENV/
 *.sqlite
 *.sqlite3
 installment_business.db
+data/
+*.db.backup
+*.db.before_restore_*
+
+# Backups
+backups/
+*.gz
+*.xz

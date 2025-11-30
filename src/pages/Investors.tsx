@@ -16,7 +16,6 @@ import {
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -27,20 +26,16 @@ import {
   investorTransactionsStore,
   Investor,
   InvestorTransaction,
-  partnersStore,
-  salesStore,
-  installmentsStore,
-  expensesStore,
 } from "@/lib/storeProvider";
-import { calculateFinancialsFromData } from "@/lib/profitCalculator";
 import { formatCurrency, toJalaliDate, toPersianDigits } from "@/lib/persian";
-import { Plus, TrendingUp, DollarSign, Trash2, Eye, User, Phone, IdCard, Calendar, Percent, Wallet, CheckCircle2, FileText, ArrowUp, ArrowDown, Activity, CreditCard, AlertCircle, Edit } from "lucide-react";
+import { Plus, TrendingUp, DollarSign, Trash2, Eye, User, Phone, IdCard, Calendar, Percent, Wallet, CheckCircle2, FileText, ArrowUp, ArrowDown, Activity, AlertCircle, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { JalaliDatePicker } from "@/components/JalaliDatePicker";
 
 const Investors = () => {
   const [investors, setInvestors] = useState<Investor[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [transactions, setTransactions] = useState<InvestorTransaction[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingInvestor, setEditingInvestor] = useState<Investor | null>(null);
@@ -429,6 +424,18 @@ const Investors = () => {
     }
   };
 
+  // فیلتر کردن سرمایه‌گذاران بر اساس جستجو
+  const filteredInvestors = investors.filter(investor => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase();
+    return (
+      investor.name.toLowerCase().includes(query) ||
+      investor.phone.includes(query) ||
+      investor.nationalId.includes(query)
+    );
+  });
+
   const totalInvestment = investors.reduce((sum, i) => sum + i.investmentAmount, 0);
   const totalProfit = investors.reduce((sum, i) => sum + i.totalProfit, 0);
   const activeInvestors = investors.filter(i => i.status === 'active').length;
@@ -684,8 +691,28 @@ const Investors = () => {
           </Card>
         </div>
 
+        {/* جستجو */}
+        <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+          <CardContent className="pt-6">
+            <div className="relative">
+              <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="جستجو بر اساس نام، شماره تماس یا کد ملی..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pr-10"
+              />
+            </div>
+            {searchQuery && (
+              <p className="text-sm text-muted-foreground mt-2">
+                {filteredInvestors.length} نتیجه یافت شد
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="space-y-4">
-          {investors.map((investor) => {
+          {filteredInvestors.map((investor) => {
             const investorTransactions = transactions.filter(t => t.investorId === investor.id);
             const profitTransactions = investorTransactions.filter(t => t.type === 'profit_payment');
             
@@ -839,6 +866,18 @@ const Investors = () => {
             );
           })}
         </div>
+
+        {filteredInvestors.length === 0 && investors.length > 0 && (
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm">
+            <div className="absolute inset-0 bg-gradient-to-br from-warning/5 via-transparent to-warning/5" />
+            <CardContent className="flex flex-col items-center justify-center py-12 relative z-10">
+              <h3 className="text-xl font-semibold mb-2">نتیجه‌ای یافت نشد</h3>
+              <p className="text-muted-foreground text-center">
+                با جستجوی "{searchQuery}"، سرمایه‌گذاری پیدا نشد.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {investors.length === 0 && (
           <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm">

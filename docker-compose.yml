@@ -10,7 +10,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      - backend-db:/app/data
+      - ./data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
@@ -37,10 +37,6 @@ services:
     restart: unless-stopped
     networks:
       - app-network
-
-volumes:
-  backend-db:
-    driver: local
 
 networks:
   app-network:

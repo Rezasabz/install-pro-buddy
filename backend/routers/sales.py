@@ -43,7 +43,8 @@ def create_sale(sale: SaleCreate):
     with get_db() as conn:
         cursor = conn.cursor()
         sale_id = str(uuid.uuid4())
-        sale_date = datetime.now().isoformat()
+        # استفاده از تاریخ ارسال شده از frontend یا تاریخ امروز اگر ارسال نشده
+        sale_date = sale.sale_date if sale.sale_date else datetime.now().isoformat()
         
         cursor.execute("""
             INSERT INTO sales (id, customer_id, phone_id, announced_price, purchase_price, down_payment,

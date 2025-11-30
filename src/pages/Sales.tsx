@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { InvoiceDialog } from "@/components/InvoiceDialog";
+import { JalaliDatePicker } from "@/components/JalaliDatePicker";
 import { useDataContext } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,7 +55,7 @@ import {
   deductCapitalForPurchase,
   addInitialProfitToPartners
 } from "@/lib/profitCalculator";
-import { Plus, ShoppingCart, TrendingUp, Trash2, Eye, User, Smartphone, DollarSign, Calendar, CreditCard, TrendingDown, CheckCircle2, Clock, AlertCircle, FileText, Percent, Hash } from "lucide-react";
+import { Plus, ShoppingCart, TrendingUp, Trash2, Eye, Edit, User, Smartphone, DollarSign, Calendar, CreditCard, TrendingDown, CheckCircle2, Clock, AlertCircle, FileText, Percent, Hash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -64,9 +65,11 @@ const Sales = () => {
   const [phones, setPhones] = useState<Phone[]>([]);
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; saleId: string }>({ open: false, saleId: '' });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; saleId: string; saleInfo: string }>({ open: false, saleId: '', saleInfo: '' });
   const [invoiceDialog, setInvoiceDialog] = useState<{
@@ -82,6 +85,7 @@ const Sales = () => {
     phone: null,
     installments: [],
   });
+  const [saleDate, setSaleDate] = useState<Date>(new Date());
   const [formData, setFormData] = useState({
     customerId: "",
     phoneId: "", // گوشی از موجودی
@@ -158,6 +162,22 @@ const Sales = () => {
     loadSales();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // فیلتر کردن فروش‌ها
+  const filteredSales = sales.filter(sale => {
+    if (searchQuery === "") return true;
+    
+    const customer = customers.find(c => c.id === sale.customerId);
+    const phone = phones.find(p => p.id === sale.phoneId);
+    
+    return (
+      customer?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customer?.phone.includes(searchQuery) ||
+      phone?.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      phone?.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      phone?.imei.includes(searchQuery)
+    );
+  });
 
   // Listen for refresh events from other pages
   useEffect(() => {
@@ -286,8 +306,114 @@ const Sales = () => {
     setFormData({ ...formData, downPayment: formatted });
   };
 
+  const handleEdit = (sale: Sale) => {
+    setEditingSale(sale);
+    setFormData({
+      customerId: sale.customerId,
+      phoneId: sale.phoneId,
+      announcedPrice: sale.announcedPrice.toString(),
+      downPayment: sale.downPayment.toString(),
+      installmentMonths: sale.installmentMonths.toString(),
+      profitCalculationType: sale.profitCalculationType || "fixed_4_percent",
+      customProfitRate: sale.customProfitRate?.toString() || "8",
+    });
+    setSaleDate(new Date(sale.saleDate));
+    setIsDialogOpen(true);
+  };
+
+  const handleUpdateSale = async () => {
+    if (!editingSale) return;
+
+    try {
+      setIsLoading(true);
+      setLoadingMessage("در حال آپدیت فروش...");
+
+      const announcedPrice = parseFloat(formData.announcedPrice.replace(/,/g, ''));
+      const downPayment = parseFloat(formData.downPayment.replace(/,/g, ''));
+      const installmentMonths = parseInt(formData.installmentMonths);
+
+      // محاسبه مجدد سود
+      const phone = phones.find(p => p.id === editingSale.phoneId);
+      if (!phone) throw new Error("گوشی یافت نشد");
+
+      const purchasePrice = phone.purchasePrice;
+      const initialProfit = announcedPrice - purchasePrice;
+
+      const customRate = formData.profitCalculationType === "custom_annual" 
+        ? parseFloat(formData.customProfitRate) / 100 
+        : parseFloat(formData.customProfitRate) / 100;
+
+      const remainingDebt = announcedPrice - downPayment;
+      const profitResult = calculateProfit(
+        remainingDebt,
+        installmentMonths,
+        formData.profitCalculationType,
+        customRate
+      );
+
+      // آپدیت فروش
+      const updateData: Record<string, unknown> = {
+        announced_price: announcedPrice,
+        down_payment: downPayment,
+        installment_months: installmentMonths,
+        profit_calculation_type: formData.profitCalculationType,
+        custom_profit_rate: customRate,
+        total_profit: profitResult.totalProfit,
+        initial_profit: initialProfit,
+        sale_date: saleDate.toISOString(),
+      };
+      await salesStore.update(editingSale.id, updateData as Partial<Sale>);
+
+      // حذف اقساط قدیمی
+      const oldInstallments = installments.filter(i => i.saleId === editingSale.id);
+      for (const inst of oldInstallments) {
+        await installmentsStore.delete(inst.id);
+      }
+
+      // ایجاد اقساط جدید
+      for (const inst of profitResult.installments) {
+        const dueDate = addMonthsToDate(saleDate, inst.installmentNumber);
+        
+        await installmentsStore.add({
+          saleId: editingSale.id,
+          installmentNumber: inst.installmentNumber,
+          principalAmount: inst.principalAmount,
+          interestAmount: inst.interestAmount,
+          totalAmount: inst.totalAmount,
+          remainingDebt: inst.remainingDebt,
+          dueDate: dueDate.toISOString(),
+          status: 'pending',
+        });
+      }
+
+      toast({
+        title: "موفق",
+        description: "فروش با موفقیت آپدیت شد",
+      });
+
+      setIsDialogOpen(false);
+      setEditingSale(null);
+      await loadSales();
+    } catch (error) {
+      console.error('Error updating sale:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در آپدیت فروش",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (editingSale) {
+      // ویرایش فروش - فقط اجازه تغییر تاریخ و مبالغ
+      await handleUpdateSale();
+      return;
+    }
 
     const phone = availablePhones.find(p => p.id === formData.phoneId);
     if (!phone) {
@@ -417,7 +543,7 @@ const Sales = () => {
         monthlyInterestRate: 0.04, // برای سازگاری با کد قدیمی
         totalProfit: profitResult.totalProfit,
         initialProfit,
-        saleDate: new Date().toISOString(),
+        saleDate: saleDate.toISOString(),
         status: 'active',
       });
 
@@ -425,10 +551,9 @@ const Sales = () => {
       await phonesStore.update(formData.phoneId, { status: 'sold' });
 
       // ایجاد اقساط
-      const today = new Date();
       for (const inst of profitResult.installments) {
         // استفاده از تابع addMonthsToDate برای محاسبه دقیق تاریخ با تقویم شمسی
-        const dueDate = addMonthsToDate(today, inst.installmentNumber);
+        const dueDate = addMonthsToDate(saleDate, inst.installmentNumber);
         
         await installmentsStore.add({
           saleId: newSale.id,
@@ -521,7 +646,10 @@ const Sales = () => {
               ثبت و مدیریت فروش‌های اقساطی
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) setEditingSale(null);
+          }}>
             <DialogTrigger asChild>
               <Button
                 onClick={() => {
@@ -534,6 +662,7 @@ const Sales = () => {
                     profitCalculationType: "fixed_4_percent",
                     customProfitRate: "8",
                   });
+                  setSaleDate(new Date());
                 }}
                 disabled={customers.length === 0 || availablePhones.length === 0}
                 className="gap-2 hover:scale-105 transition-all duration-200"
@@ -542,34 +671,62 @@ const Sales = () => {
                 ثبت فروش جدید
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>ثبت فروش جدید</DialogTitle>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+              <DialogHeader className="flex-shrink-0">
+                <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
+                  {editingSale ? "ویرایش فروش" : "ثبت فروش جدید"}
+                </DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
-                <div>
-                  <Label htmlFor="customerId">مشتری</Label>
-                  <Select
-                    value={formData.customerId}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, customerId: value })
-                    }
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="انتخاب مشتری" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name} - {customer.phone}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="phoneId">گوشی از موجودی</Label>
+              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-1">
+                <div className="space-y-6 py-4">
+                
+                {/* بخش اطلاعات اصلی */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    اطلاعات مشتری و گوشی
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="customerId">مشتری</Label>
+                      <Select
+                        value={formData.customerId}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, customerId: value })
+                        }
+                        required
+                        disabled={!!editingSale}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="انتخاب مشتری" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {customers.map((customer) => (
+                            <SelectItem key={customer.id} value={customer.id}>
+                              {customer.name} - {customer.phone}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {editingSale && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          غیرقابل تغییر
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <Label>تاریخ فروش</Label>
+                      <JalaliDatePicker
+                        value={saleDate}
+                        onChange={setSaleDate}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="phoneId">گوشی از موجودی</Label>
                   <Select
                     value={formData.phoneId}
                     onValueChange={(value) => {
@@ -581,6 +738,7 @@ const Sales = () => {
                       });
                     }}
                     required
+                    disabled={!!editingSale}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="انتخاب گوشی" />
@@ -593,55 +751,63 @@ const Sales = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    گوشی‌های موجود در انبار
-                  </p>
-                </div>
-                <div>
-                  <Label htmlFor="announcedPrice">قیمت اعلامی به مشتری (تومان)</Label>
-                  <Input
-                    id="announcedPrice"
-                    type="text"
-                    value={formData.announcedPrice}
-                    onChange={handleAnnouncedPriceChange}
-                    required
-                    placeholder="مثال: ۲۲,۰۰۰,۰۰۰"
-                    dir="ltr"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    قیمتی که به مشتری اعلام می‌کنید (پیش‌فرض: قیمت فروش گوشی)
-                  </p>
-                </div>
-                <div>
-                  <Label htmlFor="downPayment">پیش‌پرداخت (تومان)</Label>
-                  <Input
-                    id="downPayment"
-                    type="text"
-                    value={formData.downPayment}
-                    onChange={handleDownPaymentChange}
-                    required
-                    placeholder="مثال: ۵,۰۰۰,۰۰۰"
-                    dir="ltr"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="installmentMonths">تعداد اقساط (ماه)</Label>
-                  <Input
-                    id="installmentMonths"
-                    type="number"
-                    min="2"
-                    max="36"
-                    value={formData.installmentMonths}
-                    onChange={(e) =>
-                      setFormData({ ...formData, installmentMonths: e.target.value })
-                    }
-                    placeholder="حداقل ۲، حداکثر ۳۶"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">حداقل ۲ ماه، حداکثر ۳۶ ماه</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      گوشی‌های موجود در انبار
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="profitCalculationType">نوع محاسبه سود</Label>
+                {/* بخش مبالغ */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    مبالغ و اقساط
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="announcedPrice">قیمت اعلامی (تومان)</Label>
+                      <Input
+                        id="announcedPrice"
+                        type="text"
+                        value={formData.announcedPrice}
+                        onChange={handleAnnouncedPriceChange}
+                        required
+                        placeholder="مثال: ۲۲,۰۰۰,۰۰۰"
+                        dir="ltr"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="downPayment">پیش‌پرداخت (تومان)</Label>
+                      <Input
+                        id="downPayment"
+                        type="text"
+                        value={formData.downPayment}
+                        onChange={handleDownPaymentChange}
+                        required
+                        placeholder="مثال: ۵,۰۰۰,۰۰۰"
+                        dir="ltr"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="installmentMonths">تعداد اقساط (ماه)</Label>
+                      <Input
+                        id="installmentMonths"
+                        type="number"
+                        min="2"
+                        max="36"
+                        value={formData.installmentMonths}
+                        onChange={(e) =>
+                          setFormData({ ...formData, installmentMonths: e.target.value })
+                        }
+                        placeholder="حداقل ۲، حداکثر ۳۶"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="profitCalculationType">نوع محاسبه سود</Label>
                   <Select
                     value={formData.profitCalculationType}
                     onValueChange={(value: ProfitCalculationType) =>
@@ -662,34 +828,36 @@ const Sales = () => {
                         سود دلخواه (حداقل ۸٪)
                       </SelectItem>
                     </SelectContent>
-                  </Select>
-                </div>
-
-                {(formData.profitCalculationType === 'fixed_4_percent' || formData.profitCalculationType === 'custom_annual') && (
-                  <div>
-                    <Label htmlFor="customProfitRate">
-                      {formData.profitCalculationType === 'fixed_4_percent' 
-                        ? 'درصد سود ماهیانه (پیش‌فرض: ۴٪)' 
-                        : 'درصد سود (حداقل ۸٪)'}
-                    </Label>
-                    <Input
-                      id="customProfitRate"
-                      type="number"
-                      min={formData.profitCalculationType === 'fixed_4_percent' ? '1' : '8'}
-                      step="0.5"
-                      value={formData.customProfitRate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, customProfitRate: e.target.value })
-                      }
-                      placeholder={formData.profitCalculationType === 'fixed_4_percent' ? 'مثال: ۴' : 'مثال: ۱۰'}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {formData.profitCalculationType === 'fixed_4_percent'
-                        ? 'درصد سود روی مانده بدهی هر ماه محاسبه می‌شود'
-                        : 'سود روی کل مبلغ باقیمانده محاسبه می‌شود'}
-                    </p>
+                      </Select>
+                    </div>
                   </div>
-                )}
+
+                  {(formData.profitCalculationType === 'fixed_4_percent' || formData.profitCalculationType === 'custom_annual') && (
+                    <div>
+                      <Label htmlFor="customProfitRate">
+                        {formData.profitCalculationType === 'fixed_4_percent' 
+                          ? 'درصد سود ماهیانه (پیش‌فرض: ۴٪)' 
+                          : 'درصد سود (حداقل ۸٪)'}
+                      </Label>
+                      <Input
+                        id="customProfitRate"
+                        type="number"
+                        min={formData.profitCalculationType === 'fixed_4_percent' ? '1' : '8'}
+                        step="0.5"
+                        value={formData.customProfitRate}
+                        onChange={(e) =>
+                          setFormData({ ...formData, customProfitRate: e.target.value })
+                        }
+                        placeholder={formData.profitCalculationType === 'fixed_4_percent' ? 'مثال: ۴' : 'مثال: ۱۰'}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formData.profitCalculationType === 'fixed_4_percent'
+                          ? 'درصد سود روی مانده بدهی هر ماه محاسبه می‌شود'
+                          : 'سود روی کل مبلغ باقیمانده محاسبه می‌شود'}
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 {preview.installments.length > 0 && (
                   <div className="p-4 bg-muted rounded-lg space-y-3">
@@ -760,9 +928,12 @@ const Sales = () => {
                   </div>
                 )}
 
-                <Button type="submit" className="w-full">
-                  ثبت فروش
-                </Button>
+                <div className="sticky bottom-0 bg-background pt-4 pb-2 border-t mt-6">
+                  <Button type="submit" className="w-full h-12 text-base font-semibold">
+                    {editingSale ? "💾 ذخیره تغییرات" : "✨ ثبت فروش"}
+                  </Button>
+                </div>
+                </div>
               </form>
             </DialogContent>
           </Dialog>
@@ -812,8 +983,28 @@ const Sales = () => {
           </Card>
         </div>
 
+        {/* جستجو */}
+        <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+          <CardContent className="pt-6">
+            <div className="relative">
+              <ShoppingCart className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="جستجو بر اساس نام مشتری، شماره تلفن، برند یا مدل گوشی..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pr-10"
+              />
+            </div>
+            {searchQuery && (
+              <p className="text-sm text-muted-foreground mt-2">
+                {filteredSales.length} نتیجه یافت شد
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="space-y-4">
-          {sales.map((sale) => {
+          {filteredSales.map((sale) => {
             const details = getSaleDetails(sale);
             return (
               <Card key={sale.id} className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.01] transition-all duration-300 group">
@@ -892,6 +1083,15 @@ const Sales = () => {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => handleEdit(sale)}
+                        className="gap-2 hover:bg-secondary/10 hover:border-secondary/50 hover:scale-105 transition-all duration-200"
+                      >
+                        <Edit className="h-3 w-3" />
+                        ویرایش
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => setDetailsDialog({ open: true, saleId: sale.id })}
                         className="gap-2 hover:bg-primary/10 hover:border-primary/50 hover:scale-105 transition-all duration-200"
                       >
@@ -908,6 +1108,19 @@ const Sales = () => {
             );
           })}
         </div>
+
+        {filteredSales.length === 0 && sales.length > 0 && (
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm">
+            <div className="absolute inset-0 bg-gradient-to-br from-warning/5 via-transparent to-warning/5" />
+            <CardContent className="relative flex flex-col items-center justify-center py-12">
+              <AlertCircle className="h-16 w-16 text-warning mb-4" />
+              <h3 className="text-xl font-semibold mb-2">نتیجه‌ای یافت نشد</h3>
+              <p className="text-muted-foreground text-center">
+                با جستجوی "{searchQuery}"، فروشی پیدا نشد.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {sales.length === 0 && (
           <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm">

@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 
 const Partners = () => {
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [partnerFinancials, setPartnerFinancials] = useState<Map<string, PartnerFinancials>>(new Map());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
@@ -929,8 +930,30 @@ const Partners = () => {
           </Card>
         </div>
 
+        {/* جستجو */}
+        <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+          <CardContent className="pt-6">
+            <div className="relative">
+              <Users className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="جستجو بر اساس نام شریک..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pr-10"
+              />
+            </div>
+            {searchQuery && (
+              <p className="text-sm text-muted-foreground mt-2">
+                {partners.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).length} نتیجه یافت شد
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-          {partners.map((partner, index) => {
+          {partners.filter(partner => 
+            searchQuery === "" || partner.name.toLowerCase().includes(searchQuery.toLowerCase())
+          ).map((partner, index) => {
             const financial = partnerFinancials.get(partner.id);
             const capitalUsagePercentage = partner.capital > 0 ? ((partner.capital - partner.availableCapital) / partner.capital) * 100 : 0;
             
@@ -1183,6 +1206,19 @@ const Partners = () => {
             );
           })}
         </div>
+
+        {partners.filter(p => searchQuery === "" || p.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && partners.length > 0 && (
+          <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm">
+            <div className="absolute inset-0 bg-gradient-to-br from-warning/5 via-transparent to-warning/5" />
+            <CardContent className="relative flex flex-col items-center justify-center py-12">
+              <AlertCircle className="h-16 w-16 text-warning mb-4" />
+              <h3 className="text-xl font-semibold mb-2">نتیجه‌ای یافت نشد</h3>
+              <p className="text-muted-foreground text-center">
+                با جستجوی "{searchQuery}"، شریکی پیدا نشد.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {partners.length === 0 && (
           <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm">

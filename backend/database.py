@@ -85,6 +85,9 @@ def init_db():
                 installment_months INTEGER NOT NULL,
                 monthly_interest_rate REAL NOT NULL DEFAULT 0.04,
                 initial_profit REAL NOT NULL DEFAULT 0,
+                profit_calculation_type TEXT DEFAULT 'fixed_4_percent',
+                custom_profit_rate REAL DEFAULT 0.04,
+                total_profit REAL DEFAULT 0,
                 sale_date TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'active',
                 FOREIGN KEY (customer_id) REFERENCES customers(id),
@@ -172,6 +175,17 @@ def init_db():
                 amount REAL NOT NULL,
                 description TEXT NOT NULL,
                 created_at TEXT NOT NULL
+            )
+        """)
+        
+        # Custom Phone Models table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS custom_phone_models (
+                id TEXT PRIMARY KEY,
+                brand TEXT NOT NULL,
+                model TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(brand, model)
             )
         """)
         

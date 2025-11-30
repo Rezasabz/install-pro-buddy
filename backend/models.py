@@ -125,7 +125,17 @@ class SaleCreate(SaleBase):
     model_config = ConfigDict(populate_by_name=True)
 
 class SaleUpdate(BaseModel):
+    announced_price: Optional[float] = None
+    down_payment: Optional[float] = None
+    installment_months: Optional[int] = None
+    profit_calculation_type: Optional[str] = None
+    custom_profit_rate: Optional[float] = None
+    total_profit: Optional[float] = None
+    initial_profit: Optional[float] = None
+    sale_date: Optional[str] = None
     status: Optional[Literal['active', 'completed', 'defaulted']] = None
+    
+    model_config = ConfigDict(populate_by_name=True)
 
 class Sale(SaleBase):
     id: str

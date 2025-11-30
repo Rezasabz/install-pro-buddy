@@ -368,8 +368,40 @@ const Customers = () => {
           </CardContent>
         </Card>
 
+        {/* جستجو و فیلتر */}
+        <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="جستجو بر اساس نام، شماره تلفن یا کد ملی..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pr-10"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="وضعیت" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">همه</SelectItem>
+                  <SelectItem value="active">فعال</SelectItem>
+                  <SelectItem value="inactive">غیرفعال</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {searchQuery && (
+              <p className="text-sm text-muted-foreground mt-2">
+                {filteredCustomers.length} نتیجه یافت شد
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {customers.map((customer, index) => (
+          {filteredCustomers.map((customer, index) => (
             <Card 
               key={customer.id} 
               className="relative overflow-hidden bg-card/80 backdrop-blur-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group animate-slide-in"
