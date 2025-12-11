@@ -10,7 +10,16 @@ router = APIRouter()
 
 @router.get("/", response_model=List[Partner])
 def get_partners():
-    """Get all partners"""
+    """Get all active partners"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM partners WHERE status = 'active' ORDER BY created_at DESC")
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+@router.get("/all", response_model=List[Partner])
+def get_all_partners():
+    """Get all partners including inactive ones (for calculations)"""
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM partners ORDER BY created_at DESC")
@@ -23,7 +32,8 @@ def create_partner(partner: PartnerCreate):
     with get_db() as conn:
         cursor = conn.cursor()
         partner_id = str(uuid.uuid4())
-        created_at = datetime.now().isoformat()
+        # استفاده از تاریخ ارسال شده یا تاریخ فعلی
+        created_at = partner.join_date if partner.join_date else datetime.now().isoformat()
         
         cursor.execute("""
             INSERT INTO partners (id, name, capital, available_capital, initial_profit, monthly_profit, share, created_at)
@@ -74,10 +84,17 @@ def update_partner(partner_id: str, partner: PartnerUpdate):
 
 @router.delete("/{partner_id}")
 def delete_partner(partner_id: str):
-    """Delete a partner"""
+    """Soft delete a partner (mark as inactive)"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM partners WHERE id = ?", (partner_id,))
+        deleted_at = datetime.now().isoformat()
+        
+        cursor.execute("""
+            UPDATE partners 
+            SET status = 'inactive', deleted_at = ? 
+            WHERE id = ? AND status = 'active'
+        """, (deleted_at, partner_id))
+        
         if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Partner not found")
+            raise HTTPException(status_code=404, detail="Partner not found or already deleted")
         return {"message": "Partner deleted successfully"}

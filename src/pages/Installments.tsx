@@ -163,11 +163,12 @@ const Installments = () => {
         paidDate: new Date().toISOString(),
       });
 
-      // بازگشت اصل بدهی به سرمایه
-      await addCapitalFromPayment(installment.principalAmount);
+      // بازگشت اصل بدهی به سرمایه با تاریخ قسط
+      const installmentDate = new Date(installment.dueDate);
+      await addCapitalFromPayment(installment.principalAmount, installmentDate);
 
-      // افزودن سود ماهانه به حساب شرکا
-      await addMonthlyProfitToPartners(installment.interestAmount);
+      // افزودن سود ماهانه به حساب شرکا با تاریخ قسط
+      await addMonthlyProfitToPartners(installment.interestAmount, installmentDate);
 
       // پرداخت سود به سرمایه‌گذاران (۴٪ از سود ماهانه)
       const { payInvestorsProfit } = await import('@/lib/profitCalculator');

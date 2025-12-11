@@ -13,6 +13,8 @@ export interface Partner {
   monthlyProfit: number;
   share: number;
   createdAt: string;
+  status?: 'active' | 'inactive'; // برای نگه داشتن تاریخچه
+  deletedAt?: string; // تاریخ غیرفعال شدن
 }
 
 export interface Transaction {
@@ -137,7 +139,11 @@ export const partnersStore = {
     return await apiCall<Partner[]>('/api/partners');
   },
 
-  add: async (partner: Omit<Partner, 'id' | 'createdAt' | 'availableCapital' | 'initialProfit' | 'monthlyProfit'>): Promise<Partner> => {
+  getAllIncludingInactive: async (): Promise<Partner[]> => {
+    return await apiCall<Partner[]>('/api/partners/all');
+  },
+
+  add: async (partner: Omit<Partner, 'id' | 'createdAt' | 'availableCapital' | 'initialProfit' | 'monthlyProfit'> & { joinDate?: string }): Promise<Partner> => {
     return await apiCall<Partner>('/api/partners', {
       method: 'POST',
       body: JSON.stringify(partner),

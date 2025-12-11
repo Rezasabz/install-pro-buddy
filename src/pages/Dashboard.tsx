@@ -134,7 +134,9 @@ const Dashboard = () => {
         .filter(i => i.status === 'pending' || i.status === 'overdue')
         .reduce((sum, inst) => sum + inst.totalAmount, 0);
 
-      const financials = calculateFinancialsFromData(allPartners, allSales, allInstallments);
+      // دریافت تمام شرکا (شامل غیرفعال‌ها) برای محاسبات دقیق
+      const allPartnersIncludingInactive = await partnersStore.getAllIncludingInactive();
+      const financials = calculateFinancialsFromData(allPartners, allSales, allInstallments, allPartnersIncludingInactive);
       const totalExpenses = allExpenses.reduce((sum, e) => sum + e.amount, 0);
       
       // محاسبه سرمایه سرمایه‌گذاران
@@ -173,6 +175,36 @@ const Dashboard = () => {
       setLoading(false);
     }
   }, [toast]);
+
+  const handleValidateData = async () => {
+    try {
+      const { validateAndFixFinancialData } = await import('@/lib/dataValidator');
+      const result = await validateAndFixFinancialData();
+      
+      if (result.isValid) {
+        toast({
+          title: "✅ محاسبات صحیح",
+          description: result.corrections.join('\n'),
+        });
+      } else {
+        toast({
+          title: "⚠️ مشکلات برطرف شد",
+          description: `${result.warnings.length} هشدار و ${result.corrections.length} تصحیح انجام شد`,
+        });
+      }
+      
+      // بروزرسانی داده‌ها
+      await fetchDashboardStats();
+      
+    } catch (error) {
+      console.error('Error validating data:', error);
+      toast({
+        title: "خطا",
+        description: "خطا در بررسی داده‌ها",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleClearAllData = async () => {
     setIsDeleting(true);
@@ -339,6 +371,15 @@ const Dashboard = () => {
                 بارگذاری داده نمونه
               </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleValidateData}
+              className="gap-2"
+            >
+              <Activity className="h-4 w-4" />
+              بررسی و تصحیح محاسبات
+            </Button>
             <Button
               variant="destructive"
               size="sm"

@@ -458,8 +458,8 @@ const Sales = () => {
       return;
     }
 
-    // بررسی موجودی سرمایه
-    const capitalCheck = checkCapitalAvailability(purchasePrice, partners);
+    // بررسی موجودی سرمایه با در نظر گیری تاریخ فروش
+    const capitalCheck = checkCapitalAvailability(purchasePrice, partners, saleDate);
     if (!capitalCheck.isAvailable) {
       toast({
         title: "سرمایه ناکافی",
@@ -567,11 +567,11 @@ const Sales = () => {
         });
       }
 
-      // کاهش سرمایه در دسترس
-      await deductCapitalForPurchase(purchasePrice);
+      // کاهش سرمایه در دسترس با تاریخ فروش
+      await deductCapitalForPurchase(purchasePrice, saleDate);
 
-      // ثبت سود اولیه
-      await addInitialProfitToPartners(initialProfit);
+      // ثبت سود اولیه با تاریخ فروش
+      await addInitialProfitToPartners(initialProfit, saleDate);
 
       toast({
         title: "موفق",

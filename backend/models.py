@@ -9,7 +9,7 @@ class PartnerBase(BaseModel):
     share: float
 
 class PartnerCreate(PartnerBase):
-    pass
+    join_date: Optional[str] = Field(None, alias='joinDate')
 
 class PartnerUpdate(BaseModel):
     name: Optional[str] = None
@@ -27,6 +27,8 @@ class Partner(PartnerBase):
     initial_profit: float = Field(..., alias='initialProfit')
     monthly_profit: float = Field(..., alias='monthlyProfit')
     created_at: str = Field(..., alias='createdAt')
+    status: Optional[str] = 'active'
+    deleted_at: Optional[str] = Field(None, alias='deletedAt')
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 

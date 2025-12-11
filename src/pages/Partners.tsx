@@ -30,6 +30,7 @@ import { calculateFinancialsFromData, PartnerFinancials } from "@/lib/profitCalc
 import { Plus, Edit, Trash2, Users, TrendingUp, DollarSign, ArrowUp, ArrowDown, Eye, Percent, CreditCard, Wallet, PieChart, Activity, Calendar, FileText, Sparkles, Target, Zap, User, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { JalaliDatePicker } from "@/components/JalaliDatePicker";
 
 const Partners = () => {
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -41,6 +42,7 @@ const Partners = () => {
     name: "",
     capital: "",
   });
+  const [joinDate, setJoinDate] = useState<Date>(new Date());
   const [transactionDialog, setTransactionDialog] = useState<{
     open: boolean;
     partnerId: string;
@@ -77,8 +79,9 @@ const Partners = () => {
       }));
       setPartners(partnersWithShare);
 
-      // محاسبه وضعیت مالی هر شریک
-      const financials = calculateFinancialsFromData(data, sales, installments);
+      // محاسبه وضعیت مالی هر شریک با در نظر گیری تمام شرکا (شامل غیرفعال‌ها)
+      const allPartnersIncludingInactive = await partnersStore.getAllIncludingInactive();
+      const financials = calculateFinancialsFromData(data, sales, installments, allPartnersIncludingInactive);
       const financialMap = new Map<string, PartnerFinancials>();
       financials.partnerFinancials.forEach(p => {
         financialMap.set(p.partnerId, p);
@@ -180,14 +183,17 @@ const Partners = () => {
           name: formData.name,
           capital,
           share: 0,
+          joinDate: joinDate.toISOString(),
         });
+        
         toast({
           title: "موفق",
-          description: "شریک جدید با موفقیت اضافه شد",
+          description: "شریک جدید اضافه شد",
         });
       }
 
       setFormData({ name: "", capital: "" });
+      setJoinDate(new Date());
       setEditingPartner(null);
       loadPartners();
     } catch (error) {
@@ -209,6 +215,7 @@ const Partners = () => {
       name: partner.name,
       capital: partner.capital.toLocaleString('en-US'),
     });
+    setJoinDate(new Date(partner.createdAt));
     setIsDialogOpen(true);
   };
 
@@ -422,7 +429,14 @@ const Partners = () => {
               مدیریت سرمایه‌گذاری، سهم و سود شرکا
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) {
+              setFormData({ name: "", capital: "" });
+              setJoinDate(new Date());
+              setEditingPartner(null);
+            }
+          }}>
             <DialogTrigger asChild>
               <Button 
                 onClick={() => {
@@ -466,6 +480,22 @@ const Partners = () => {
                     dir="ltr"
                   />
                 </div>
+                {!editingPartner && (
+                  <div>
+                    <Label htmlFor="joinDate" className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      تاریخ ورود شریک
+                    </Label>
+                    <JalaliDatePicker
+                      value={joinDate}
+                      onChange={setJoinDate}
+                      placeholder="انتخاب تاریخ ورود"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      شریک فقط از این تاریخ به بعد سهم سود خواهد داشت
+                    </p>
+                  </div>
+                )}
                 <Button type="submit" className="w-full">
                   {editingPartner ? "بروزرسانی" : "افزودن"}
                 </Button>
